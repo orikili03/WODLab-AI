@@ -63,8 +63,8 @@ export function signToken(userId: string, email: string): string {
 export function setAuthCookie(res: Response, token: string): void {
     res.cookie(AUTH_COOKIE_NAME, token, {
         httpOnly: true,
-        secure: true, // Always true for SameSite=None
-        sameSite: "none", // Required for cross-site (onrender.com subdomains)
+        secure: true,
+        sameSite: "lax", // Better for mobile/Safari ITP
         maxAge: 7 * 24 * 60 * 60 * 1000,
         path: "/",
     });
@@ -77,7 +77,7 @@ export function clearAuthCookie(res: Response): void {
     res.clearCookie(AUTH_COOKIE_NAME, {
         httpOnly: true,
         secure: true,
-        sameSite: "none",
+        sameSite: "lax",
         path: "/",
     });
 }
