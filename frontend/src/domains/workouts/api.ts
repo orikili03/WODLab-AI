@@ -18,7 +18,6 @@ export const workoutSpecSchema = z.object({
         rounds: z.number().optional(),
         movementItems: z.array(movementItemSpecSchema).optional(),
     }),
-    scalingOptions: z.array(z.string()),
     finisher: z.array(z.string()).optional(),
     intensityGuidance: z.string(),
     intendedStimulus: z.string().optional(),

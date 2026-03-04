@@ -10,7 +10,7 @@ WODLab is a sophisticated workout generation system that internalizes the **Cros
 ## 🏗️ The 4 Pillars of Architecture
 
 ### Pillar 1: The Movement Library (Rules Layer)
-The source of truth for all movements, categorized by modality (G/W/M), family (Squat, Hinge, etc.), and progressive skill ladders (Beginner -> Scaled -> RX).
+The source of truth for all movements, categorized by modality (G/W/M), family (Squat, Hinge, etc.), and progressive skill ladders (Beginner -> RX).
 
 ### Pillar 2: The Rules Engine & Coach Brain (Scoring Layer)
 - **Equipment Filtering:** Dynamically adapts to what the athlete has available.
@@ -28,7 +28,8 @@ The source of truth for all movements, categorized by modality (G/W/M), family (
 A RAG-powered middleware (Vertex AI + MongoDB Atlas Vector Search) that interprets the L1 Manual to provide:
 - The "Why" behind the workout's stimulus.
 - Personalized coaching and motivational cues.
-- Dynamic scaling options based on athlete level.
+- Personalized coaching and motivational cues.
+- Intelligent protocol selection rationale.
 
 ### Pillar 4: The Performance Loop (Data Layer)
 Structured performance tracking (numeric scoring, RPE, and completion rates) that informs future programming variance.
@@ -38,6 +39,7 @@ Structured performance tracking (numeric scoring, RPE, and completion rates) tha
 - **Backend:** Node.js, Express, TypeScript.
 - **Database:** MongoDB Atlas (Mongoose).
 - **AI/RAG:** Vertex AI (Gemini 2.0) + Atlas Vector Search.
+- **Authentication:** Dual-Auth Strategy (HttpOnly Cookies + JWT Bearer Header) for cross-domain mobile stability.
 
 ## 📁 Project Structure
 - `/WODLab-V2/frontend`: React application.

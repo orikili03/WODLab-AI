@@ -7,7 +7,7 @@ import { Button, Card } from "../components/ui";
 interface Profile {
     id: string;
     email: string;
-    fitnessLevel: "beginner" | "scaled" | "rx";
+    fitnessLevel: "beginner" | "rx";
 }
 
 export function ProfilePage() {
@@ -31,14 +31,14 @@ export function ProfilePage() {
     });
 
     const { register, handleSubmit } = useForm<{
-        fitnessLevel: "beginner" | "scaled" | "rx";
+        fitnessLevel: "beginner" | "rx";
     }>({
         values: profileQuery.data
             ? { fitnessLevel: profileQuery.data.fitnessLevel }
             : undefined,
     });
 
-    const onSubmit = (values: { fitnessLevel: "beginner" | "scaled" | "rx" }) => {
+    const onSubmit = (values: { fitnessLevel: "beginner" | "rx" }) => {
         mutation.mutate({ fitnessLevel: values.fitnessLevel });
     };
 
@@ -69,7 +69,6 @@ export function ProfilePage() {
                                 {...register("fitnessLevel")}
                             >
                                 <option value="beginner">Beginner</option>
-                                <option value="scaled">Scaled</option>
                                 <option value="rx">RX</option>
                             </select>
                         </div>

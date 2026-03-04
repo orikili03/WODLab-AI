@@ -30,8 +30,7 @@ const FALLBACK_THRESHOLD = 3;
 const DIFFICULTY_RANK: Record<string, number> = { beginner: 0, intermediate: 1, advanced: 2, elite: 3 };
 const FITNESS_TO_DIFFICULTY: Record<string, string> = {
     beginner: "beginner",
-    scaled: "intermediate",
-    rx: "advanced"
+    rx: "rx"
 };
 
 // ─── MovementScorer ───────────────────────────────────────────────────────
@@ -163,10 +162,9 @@ export class MovementScorer {
         // ── Movement Demand Level ──────────────────────────────────────────
         // NEW: use native difficulty if available, else fall back to inference
         const isLoaded = Boolean(mov.isLoaded);
-        const hasProgressions = Array.isArray(mov.progressions) && (mov.progressions as unknown[]).length > 0;
 
         const nativeDifficulty = typeof mov.difficulty === "string" ? mov.difficulty : null;
-        const inferredDifficulty = nativeDifficulty ?? (isLoaded ? "rx" : hasProgressions ? "scaled" : "beginner");
+        const inferredDifficulty = nativeDifficulty ?? (isLoaded ? "rx" : "beginner");
 
         let score = 0.0;
 

@@ -44,7 +44,6 @@ export interface AssembledWod {
 export interface GeneratedWorkout {
     wod: AssembledWod;
     warmup: string[];
-    scalingOptions: string[];
     intensityGuidance: string;
     intendedStimulus: string;
     energySystem: string;
@@ -156,13 +155,13 @@ const STIMULUS_METADATA: Record<WodProtocol, StimulusMeta> = {
         energySystem: "Glycolytic / Oxidative",
         primaryStimulus: "Sustained effort — manage the burn.",
         stimulusNote:
-            "Maintain consistent pacing. Each round should take roughly the same time. Scale to keep moving.",
+            "Maintain consistent pacing. Each round should take roughly the same time.",
     },
     EMOM: {
         energySystem: "Mixed / Neuromuscular",
         primaryStimulus: "Consistent performance under interval fatigue.",
         stimulusNote:
-            "Each movement should be completable within the minute with rest. If you can't finish, reduce reps.",
+            "Each movement should be completable within the minute with rest.",
     },
     FOR_TIME: {
         energySystem: "Mixed",
@@ -362,17 +361,9 @@ export class WodAssemblyService {
             )
         );
 
-        // ── 8. Build scaling options from movement variants ───────────────
-        const scalingOptions = selected.flatMap((fm) => {
-            const variants: string[] = (fm.movement as unknown as { variants?: string[] }).variants ?? [];
-            if (variants.length === 0) return [];
-            return [`${fm.resolvedName}: ${variants[0]} (easier) / ${variants[variants.length - 1]} (harder)`];
-        });
-
         return {
             wod,
             warmup: this.buildWarmup(category),
-            scalingOptions: scalingOptions.length > 0 ? scalingOptions : ["Reduce load or volume by 20%"],
             intensityGuidance: INTENSITY_GUIDANCE[category],
             intendedStimulus: `${timeDomain} — ${movementEmphasis
                 .map((m) => (m === "G" ? "Gymnastics" : m === "W" ? "Weightlifting" : "Monostructural"))

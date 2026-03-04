@@ -97,7 +97,7 @@ export class MovementFilterService {
         movement: Record<string, unknown> & {
             name: string;
             progressions?: Array<{ level: string; variant: string }>;
-            defaultLoadKg?: { beginner?: number; scaled?: number; rx?: number };
+            defaultLoadKg?: { beginner?: number; rx?: number };
         },
         level: FitnessLevel
     ): { name: string; loadKg?: number } {

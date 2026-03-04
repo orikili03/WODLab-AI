@@ -41,7 +41,6 @@ const progressionSchema = new Schema(
 const defaultLoadSchema = new Schema(
     {
         beginner: { type: Number },
-        scaled: { type: Number },
         rx: { type: Number },
     },
     { _id: false }
@@ -61,7 +60,7 @@ export interface IMovement extends Document {
     family?: string;
     variants: string[];
     progressions: Array<{ level: string; variant: string }>;
-    defaultLoadKg?: { beginner?: number; scaled?: number; rx?: number };
+    defaultLoadKg?: { beginner?: number; rx?: number };
     isLoaded: boolean;
     description?: string;
     cues: string[];

@@ -1,5 +1,4 @@
 import { WodBlock } from "./WodBlock";
-import { ScalingOptionsBlock } from "./ScalingOptionsBlock";
 import { EquipmentTags } from "./EquipmentTags";
 import type { WorkoutSpec } from "../../domains/workouts/api";
 import type { ReactNode } from "react";
@@ -10,22 +9,15 @@ export interface WodDetailCardProps {
     equipmentRequired?: string[];
     /** Preset/rig name used for this workout (e.g. "Home/Garage", "Travel"). */
     equipmentPresetName?: string;
-    /** When set, scaling options render above the WOD; selections apply instantly to the WOD below. */
-    scalingOptions?: {
-        options: string[];
-        selectedLabels: string[];
-        onSelectionChange: (labels: string[]) => void;
-    };
     children?: ReactNode;
     className?: string;
 }
 
-/** Detailed WOD display with optional scaling (live) and WodBlock. */
+/** Detailed WOD display with and WodBlock. */
 export function WodDetailCard({
     wod,
     equipmentRequired = [],
     equipmentPresetName,
-    scalingOptions,
     children,
     className = "",
 }: WodDetailCardProps) {
@@ -60,14 +52,6 @@ export function WodDetailCard({
                             <EquipmentTags equipmentIds={equipmentRequired} />
                         )}
                     </div>
-                )}
-                {scalingOptions && (
-                    <ScalingOptionsBlock
-                        scalingOptions={scalingOptions.options}
-                        selectedLabels={scalingOptions.selectedLabels}
-                        onSelectionChange={scalingOptions.onSelectionChange}
-                        className="mt-ds-2"
-                    />
                 )}
             </div>
             {children && (

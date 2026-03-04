@@ -47,7 +47,6 @@ export interface IWorkout extends Document {
         }>;
     };
     warmup: string[];
-    scalingOptions: string[];
     finisher?: string[];
     intensityGuidance: string;
     intendedStimulus?: string;
@@ -83,7 +82,6 @@ const workoutSchema = new Schema<IWorkout>(
 
         // --- Supporting Content ---
         warmup: [{ type: String }],
-        scalingOptions: [{ type: String }],
         finisher: [{ type: String }],
         intensityGuidance: { type: String, default: "" },
         intendedStimulus: { type: String },

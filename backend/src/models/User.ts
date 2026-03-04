@@ -1,7 +1,7 @@
 import mongoose, { Schema, type Document } from "mongoose";
 
-// ─── Fitness Levels (Option B: 3-level CrossFit terminology) ──────────────
-export const FITNESS_LEVELS = ["beginner", "scaled", "rx"] as const;
+// ─── Fitness Levels (Option B: 2-level CrossFit terminology) ──────────────
+export const FITNESS_LEVELS = ["beginner", "rx"] as const;
 export type FitnessLevel = (typeof FITNESS_LEVELS)[number];
 
 // ─── Equipment Sub-schemas (matches frontend EquipmentState Zod schema) ──
@@ -74,11 +74,6 @@ const userSchema = new Schema<IUser>(
         workoutDuration: { type: Number, default: 15 },
         goals: { type: [String], default: [] },
 
-        // ─── Future Evolution Notes ───────────────────────────────
-        // • injuries[] — NOT implemented yet. Will be added when
-        //   the injury management UI is built (Phase 2 Coach Agent
-        //   will use active injuries for auto-scaling suggestions).
-        //   Schema shape when added:
         //   { area: string, severity: "mild"|"moderate"|"severe",
         //     notes?: string, dateReported: Date, active: boolean }
         // ──────────────────────────────────────────────────────────

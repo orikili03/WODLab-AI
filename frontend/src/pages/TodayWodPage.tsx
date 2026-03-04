@@ -9,7 +9,6 @@ import { useEquipmentState } from "../domains/equipment/hooks";
 import { TimerOverlay } from "../components/timer/TimerOverlay";
 import { WodDetailCard } from "../components/wod/WodDetailCard";
 import { Card } from "../components/ui";
-import { applyScaling } from "../lib/applyScaling";
 import { BUILTIN_PRESETS, EQUIPMENT_CATALOG } from "../domains/equipment/catalog";
 
 function isWorkoutFromToday(dateStr: string): boolean {
@@ -50,15 +49,10 @@ export function TodayWodPage() {
 
     const [showGenerateForm, setShowGenerateForm] = useState(location.pathname === "/wod/generate");
     const [timerOpen, setTimerOpen] = useState(false);
-    const [selectedScaling, setSelectedScaling] = useState<string[]>([]);
 
     useEffect(() => {
         if (location.pathname === "/wod/generate") setShowGenerateForm(true);
     }, [location.pathname]);
-
-    useEffect(() => {
-        setSelectedScaling([]);
-    }, [todayWod?.id]);
 
     const { register, handleSubmit, watch, setValue } = useForm<FormValues>({
         defaultValues: {
@@ -70,7 +64,6 @@ export function TodayWodPage() {
     const selectedPresetId = watch("presetId");
     const selectedDuration = watch("duration");
     const [includedEquipmentIds, setIncludedEquipmentIds] = useState<Set<string>>(new Set());
-    const [generateFormScaling, setGenerateFormScaling] = useState<string[]>([]);
 
     useEffect(() => {
         const builtin = BUILTIN_PRESETS.find((p) => p.id === selectedPresetId);
@@ -79,16 +72,7 @@ export function TodayWodPage() {
         setIncludedEquipmentIds(new Set(selected.map((s) => s.id)));
     }, [selectedPresetId, customPresets]);
 
-    const scalingKey = selectedScaling.join("\n");
-    const displayWod = useMemo(() => {
-        if (!todayWod?.wod) return todayWod?.wod;
-        return applyScaling(todayWod.wod, selectedScaling);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [todayWod?.id, todayWod?.wod, scalingKey]);
-
-    const handleScalingChange = useCallback((labels: string[]) => {
-        setSelectedScaling(labels);
-    }, []);
+    const displayWod = todayWod?.wod;
 
     const toggleEquipment = useCallback((id: string) => {
         setIncludedEquipmentIds((prev) => {
@@ -170,11 +154,7 @@ export function TodayWodPage() {
     const showAvailableEquipmentBelow = !isNoEquipment && currentEquipment.length > 0;
 
     const generatedWod = generateMutation.data;
-    const generateFormDisplayWod = useMemo(() => {
-        if (!generatedWod?.wod) return undefined;
-        return applyScaling(generatedWod.wod, generateFormScaling);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [generatedWod?.wod, generateFormScaling.join("\n")]);
+    const generateFormDisplayWod = generatedWod?.wod;
 
     if (showGenerateForm) {
         return (
@@ -318,15 +298,6 @@ export function TodayWodPage() {
                                 <WodDetailCard
                                     wod={generateFormDisplayWod ?? generatedWod.wod}
                                     equipmentPresetName={generatedWod.equipmentPresetName}
-                                    scalingOptions={
-                                        generatedWod.scalingOptions?.length
-                                            ? {
-                                                options: generatedWod.scalingOptions,
-                                                selectedLabels: generateFormScaling,
-                                                onSelectionChange: setGenerateFormScaling,
-                                            }
-                                            : undefined
-                                    }
                                 >
                                     <div className="space-y-2 text-sm">
                                         {generatedWod.stimulusNote && (
@@ -403,18 +374,9 @@ export function TodayWodPage() {
                             </div>
                         )} */}
                         <WodDetailCard
-                            key={`today-wod-${todayWod.id}-${selectedScaling.join(",")}`}
+                            key={`today-wod-${todayWod.id}`}
                             wod={displayWod ?? todayWod.wod}
                             equipmentPresetName={todayWod.equipmentPresetName}
-                            scalingOptions={
-                                todayWod.scalingOptions && todayWod.scalingOptions.length > 0
-                                    ? {
-                                        options: todayWod.scalingOptions,
-                                        selectedLabels: selectedScaling,
-                                        onSelectionChange: handleScalingChange,
-                                    }
-                                    : undefined
-                            }
                         >
                             <div className="space-y-ds-2">
                                 {todayWod.stimulusNote && (
