@@ -63,9 +63,9 @@ export function signToken(userId: string, email: string): string {
 export function setAuthCookie(res: Response, token: string): void {
     res.cookie(AUTH_COOKIE_NAME, token, {
         httpOnly: true,
-        secure: env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days — matches JWT_EXPIRES_IN default
+        secure: true, // Always true for SameSite=None
+        sameSite: "none", // Required for cross-site (onrender.com subdomains)
+        maxAge: 7 * 24 * 60 * 60 * 1000,
         path: "/",
     });
 }
@@ -76,8 +76,8 @@ export function setAuthCookie(res: Response, token: string): void {
 export function clearAuthCookie(res: Response): void {
     res.clearCookie(AUTH_COOKIE_NAME, {
         httpOnly: true,
-        secure: env.NODE_ENV === "production",
-        sameSite: "lax",
+        secure: true,
+        sameSite: "none",
         path: "/",
     });
 }
