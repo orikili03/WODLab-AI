@@ -17,11 +17,13 @@ export class MovementCacheService {
      * Use this at server startup to eagerly load the cache.
      */
     async init(): Promise<void> {
-        console.log("🔄 Initializing Movement Library Cache...");
-        // Select all fields except __v to keep RAM footprint lean
-        this.cache = await Movement.find({}, { __v: 0 }).lean() as unknown as IMovement[];
-        this.lastFetch = Date.now();
-        console.log(`✅ Cache Primed: ${this.cache.length} movements loaded.`);
+        try {
+            this.cache = await Movement.find({}, { __v: 0 }).lean() as unknown as IMovement[];
+            this.lastFetch = Date.now();
+        } catch (err) {
+            // Cache stays null — getAll() will retry on first request
+            console.error("MovementCacheService: failed to initialize cache on startup", err);
+        }
     }
 
     /**
@@ -33,7 +35,6 @@ export class MovementCacheService {
             return this.cache;
         }
 
-        console.log("🔄 Movement Library Cache Refresh - Fetching from DB...");
         this.cache = await Movement.find({}, { __v: 0 }).lean() as unknown as IMovement[];
         this.lastFetch = now;
         return this.cache;

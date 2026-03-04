@@ -11,19 +11,17 @@ import { WodDetailCard } from "../components/wod/WodDetailCard";
 import { Card } from "../components/ui";
 import { BUILTIN_PRESETS, EQUIPMENT_CATALOG } from "../domains/equipment/catalog";
 
-function isWorkoutFromToday(dateStr: string): boolean {
-    const d = new Date(dateStr);
+function isWorkoutFromToday(w: WorkoutResponse): boolean {
     const now = new Date();
-    return (
-        d.getFullYear() === now.getFullYear() &&
-        d.getMonth() === now.getMonth() &&
-        d.getDate() === now.getDate()
-    );
+    const dd = String(now.getDate()).padStart(2, "0");
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const yyyy = now.getFullYear();
+    return w.dateString === `${dd}/${mm}/${yyyy}`;
 }
 
 function getTodayWod(history: WorkoutResponse[] | undefined): WorkoutResponse | null {
     const latest = history?.[0];
-    return latest && isWorkoutFromToday(latest.date) ? latest : null;
+    return latest && isWorkoutFromToday(latest) ? latest : null;
 }
 
 const DURATION_OPTIONS = [
@@ -279,33 +277,10 @@ export function TodayWodPage() {
                                 </p>
                             </div>
                         ) : (
-                            <>
-                                {/* {generatedWod.warmup && generatedWod.warmup.length > 0 && (
-                                    <div className="rounded-ds-lg border border-ds-border bg-ds-surface-subtle p-ds-3">
-                                        <p className="text-xs uppercase tracking-wider text-ds-text-muted font-medium mb-1">
-                                            Warm-up
-                                        </p>
-                                        <ul className="space-y-1 text-sm text-ds-text">
-                                            {generatedWod.warmup.map((s) => (
-                                                <li key={s} className="flex items-baseline gap-2">
-                                                    <span className="text-ds-text-muted">·</span>
-                                                    {s}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                )} */}
-                                <WodDetailCard
-                                    wod={generateFormDisplayWod ?? generatedWod.wod}
-                                    equipmentPresetName={generatedWod.equipmentPresetName}
-                                >
-                                    <div className="space-y-2 text-sm">
-                                        {generatedWod.stimulusNote && (
-                                            <p className="text-ds-text-muted italic text-sm">{generatedWod.stimulusNote}</p>
-                                        )}
-                                    </div>
-                                </WodDetailCard>
-                            </>
+                            <WodDetailCard
+                                wod={generateFormDisplayWod ?? generatedWod.wod}
+                                equipmentPresetName={generatedWod.equipmentPresetName}
+                            />
                         )}
                     </div>
                 </div>
@@ -352,36 +327,18 @@ export function TodayWodPage() {
                 )}
                 {!isLoading && todayWod && (
                     <>
-                        {todayWod.completed && (
+                        {todayWod.completedAt && (
                             <div className="flex items-center gap-2 text-emerald-400 mb-2">
                                 <CheckCircle size={26} className="shrink-0" aria-hidden />
                                 <span className="font-medium">Done</span>
                             </div>
                         )}
-                        {/* {todayWod.warmup && todayWod.warmup.length > 0 && (
-                            <div className="rounded-ds-lg border border-ds-border bg-ds-surface-subtle p-ds-3">
-                                <p className="text-xs uppercase tracking-wider text-ds-text-muted font-medium mb-1">
-                                    Warm-up
-                                </p>
-                                <ul className="space-y-ds-1 text-ds-body-sm text-ds-text">
-                                    {todayWod.warmup.map((s) => (
-                                        <li key={s} className="flex items-baseline gap-2">
-                                            <span className="text-ds-text-muted">·</span>
-                                            {s}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )} */}
                         <WodDetailCard
                             key={`today-wod-${todayWod.id}`}
                             wod={displayWod ?? todayWod.wod}
                             equipmentPresetName={todayWod.equipmentPresetName}
                         >
                             <div className="space-y-ds-2">
-                                {todayWod.stimulusNote && (
-                                    <p className="text-ds-text-muted italic text-ds-body-sm">{todayWod.stimulusNote}</p>
-                                )}
                                 <div className="grid grid-cols-2 gap-ds-2 pt-1">
                                     <button
                                         type="button"

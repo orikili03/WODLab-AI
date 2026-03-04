@@ -27,6 +27,22 @@ const generateSchema = z.object({
     salt: z.string().optional(),
 });
 
+// ─── Helper: Generate wodId and date/time strings ─────────────────────────
+function buildWodMeta(userId: string, now: Date) {
+    const dd = String(now.getDate()).padStart(2, "0");
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const yyyy = now.getFullYear();
+    const hh = String(now.getHours()).padStart(2, "0");
+    const min = String(now.getMinutes()).padStart(2, "0");
+    const ss = String(now.getSeconds()).padStart(2, "0");
+
+    return {
+        wodId: `${userId}-${dd}${mm}${yyyy}-${hh}${min}${ss}`,
+        dateString: `${dd}/${mm}/${yyyy}`,
+        timeString: `${hh}:${min}`,
+    };
+}
+
 // ─── POST /workouts/generate ──────────────────────────────────────────────
 // Full pipeline: filter → variance → assemble → save → return
 router.post("/generate", (async (req: AuthenticatedRequest, res: Response) => {
@@ -76,23 +92,33 @@ router.post("/generate", (async (req: AuthenticatedRequest, res: Response) => {
             payload.salt || ""
         );
 
-        // 6. Save to workout history
+        // 6. Build identification metadata
+        const now = new Date();
+        const meta = buildWodMeta(req.userId!, now);
+
+        // 7. Save to workout history (new structured format)
         const workout = await Workout.create({
+            wodId: meta.wodId,
             userId: req.userId,
-            date: new Date(),
+            dateString: meta.dateString,
+            timeString: meta.timeString,
             type: generated.wod.type,
+            durationPreference: payload.category,
             durationMinutes: generated.wod.duration || 0,
             ...generated,
         });
 
-        // 7. Return to frontend (matching WorkoutResponse schema)
+        // 8. Return to frontend (matching new WorkoutResponse schema)
         res.status(201).json({
             data: {
                 id: workout.id,
-                date: workout.date.toISOString(),
+                wodId: meta.wodId,
+                dateString: meta.dateString,
+                timeString: meta.timeString,
                 type: workout.type,
+                durationPreference: payload.category,
                 durationMinutes: workout.durationMinutes,
-                completed: workout.completed,
+                completedAt: null,
                 ...generated,
             },
         });
@@ -139,7 +165,6 @@ router.get("/history", (async (req: AuthenticatedRequest, res: Response) => {
     const data = page.map((w) => ({
         ...w,
         id: w._id.toString(),
-        date: w.date.toISOString(),
         _id: undefined,
     }));
 
@@ -151,21 +176,23 @@ router.get("/history", (async (req: AuthenticatedRequest, res: Response) => {
 // ─── POST /workouts/complete ──────────────────────────────────────────────
 const completeSchema = z.object({
     workoutId: z.string(),
-    completionTime: z.number().optional(),
-    roundsOrReps: z.number().optional(),
+    scoreValue: z.number().optional(),
+    scoreString: z.string().optional(),
+    rpe: z.number().min(1).max(5).optional(),
 });
 
 router.post("/complete", (async (req: AuthenticatedRequest, res: Response) => {
     try {
-        const { workoutId, completionTime, roundsOrReps } = completeSchema.parse(req.body);
+        const { workoutId, scoreValue, scoreString, rpe } = completeSchema.parse(req.body);
 
         const workout = await Workout.findOneAndUpdate(
             { _id: workoutId, userId: req.userId },
             {
                 $set: {
-                    completed: true,
-                    ...(completionTime !== undefined && { completionTime }),
-                    ...(roundsOrReps !== undefined && { roundsOrReps }),
+                    completedAt: new Date(),
+                    ...(scoreValue !== undefined && { scoreValue }),
+                    ...(scoreString !== undefined && { scoreString }),
+                    ...(rpe !== undefined && { rpe }),
                 },
             },
             { new: true }

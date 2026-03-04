@@ -1,7 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { useState, useEffect, useCallback } from "react";
 import { apiClient } from "../../lib/apiClient";
-import { clearLegacyToken, setStoredToken, clearStoredToken } from "../../lib/authToken";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 export type AuthUser = { id: string; email: string };
@@ -13,8 +12,8 @@ type AuthContextValue = {
     isLoading: boolean;
     /** Basic user info from the session. */
     user: AuthUser | null;
-    /** Call after a successful login/register to update UI state and store token. */
-    onLoginSuccess: (user: AuthUser, token?: string) => void;
+    /** Call after a successful login/register to update UI state. */
+    onLoginSuccess: (user: AuthUser) => void;
     /** Clear session (calls backend logout + wipes storage). */
     logout: () => Promise<void>;
 };
@@ -27,10 +26,8 @@ export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState<AuthUser | null>(null);
 
-    // On mount: clean up legacy token + verify session (server-side cookie or header fallback)
+    // On mount: verify session via HttpOnly cookie
     useEffect(() => {
-        clearLegacyToken();
-
         apiClient
             .get<{ user: AuthUser }>("/auth/me")
             .then((res) => {
@@ -40,13 +37,11 @@ export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
             .catch(() => {
                 setUser(null);
                 setIsAuthenticated(false);
-                clearStoredToken(); // Wipe maybe-stale token if check fails
             })
             .finally(() => setIsLoading(false));
     }, []);
 
-    const onLoginSuccess = useCallback((userData: AuthUser, token?: string) => {
-        if (token) setStoredToken(token);
+    const onLoginSuccess = useCallback((userData: AuthUser) => {
         setUser(userData);
         setIsAuthenticated(true);
     }, []);
@@ -59,7 +54,6 @@ export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
         }
         setUser(null);
         setIsAuthenticated(false);
-        clearStoredToken();
     }, []);
 
     const value: AuthContextValue = {

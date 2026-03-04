@@ -46,17 +46,22 @@ export class VarianceCheckerService {
             };
         }
 
+        // Sort newest-first (ascending ageHours = more recent) as a defensive
+        // guard — callers should already provide newest-first, but this ensures
+        // any future caller won't silently break the MethodistMatrix window.
+        const history = [...context.history].sort((a, b) => a.ageHours - b.ageHours);
+
         // Union of all patterns and modalities across all sessions
         const recentFamilies = [
-            ...new Set(context.history.flatMap((s) => s.patterns)),
+            ...new Set(history.flatMap((s) => s.patterns)),
         ];
         const recentModalities = [
-            ...new Set(context.history.flatMap((s) => s.modalities)),
+            ...new Set(history.flatMap((s) => s.modalities)),
         ];
 
         // Count modality occurrences to find least-represented
         const modalityCounts: Record<string, number> = { G: 0, W: 0, M: 0 };
-        for (const session of context.history) {
+        for (const session of history) {
             for (const mod of session.modalities) {
                 modalityCounts[mod] = (modalityCounts[mod] ?? 0) + 1;
             }

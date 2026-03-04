@@ -1,6 +1,5 @@
-import type { Config } from 'jest';
-
-const config: Config = {
+/** @type {import('jest').Config} */
+const config = {
     preset: 'ts-jest/presets/default-esm',
     testEnvironment: 'node',
     moduleNameMapper: {
@@ -11,6 +10,7 @@ const config: Config = {
             'ts-jest',
             {
                 useESM: true,
+                tsconfig: 'tsconfig.test.json',
             },
         ],
     },

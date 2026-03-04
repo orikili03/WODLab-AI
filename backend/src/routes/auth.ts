@@ -56,13 +56,11 @@ router.post("/register", (async (req: Request, res: Response) => {
         // Create user
         const user = await User.create({ email, passwordHash });
 
-        // Set HttpOnly cookie + Return token for mobile/headers fallback
         const token = signToken(user.id, user.email);
         setAuthCookie(res, token);
 
         res.status(201).json({
             user: { id: user.id, email: user.email },
-            token
         });
     } catch (err) {
         if (err instanceof z.ZodError) {
@@ -90,13 +88,11 @@ router.post("/login", (async (req: Request, res: Response) => {
             return;
         }
 
-        // Set HttpOnly cookie + Return token for mobile/headers fallback
         const token = signToken(user.id, user.email);
         setAuthCookie(res, token);
 
         res.json({
             user: { id: user.id, email: user.email },
-            token
         });
     } catch (err) {
         if (err instanceof z.ZodError) {

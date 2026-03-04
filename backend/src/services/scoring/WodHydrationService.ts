@@ -26,7 +26,7 @@ export interface HydratedContext {
     fitnessLevel: FitnessLevel;
     goals: string[];
     workoutDuration: number;
-    /** Up to 5 recent sessions, oldest first */
+    /** Up to 5 recent sessions, newest first (matches DB sort: _id: -1) */
     history: HistoricalSession[];
     /** True when the athlete has no recorded history (cold start) */
     isColdStart: boolean;
@@ -59,12 +59,11 @@ export class WodHydrationService {
         // ── Single round-trip: user profile + raw workout history ──────
         const [user, rawWorkouts] = await Promise.all([
             User.findById(userId).select("fitnessLevel goals workoutDuration").lean(),
-            Workout.find({ userId, date: { $gte: cutoff } })
-                .sort({ date: -1 })
+            Workout.find({ userId, dateString: { $exists: true } })
+                .sort({ _id: -1 })
                 .limit(5)
-                // Only pull the fields we actually need — do NOT select
-                // movementEmphasis (stale at generation time).
-                .select("date wod.movements")
+                // Pull structured movementItems for name + family extraction
+                .select("dateString timeString wod.movementItems.name wod.movementItems.family")
                 .lean(),
         ]);
 
@@ -94,29 +93,42 @@ export class WodHydrationService {
         const nowMs = now.getTime();
 
         const history: HistoricalSession[] = rawWorkouts.map((w: any) => {
-            const movementNames: string[] = w.wod?.movements ?? [];
+            // Extract movement names from structured movementItems
+            const items: Array<{ name: string; family?: string }> = w.wod?.movementItems ?? [];
+            const movementNames: string[] = items.map((item) => item.name);
 
             const modalities = new Set<Modality>();
             const patterns = new Set<string>();
 
-            for (const name of movementNames) {
-                const live = byName.get(name.trim().toLowerCase());
+            for (const item of items) {
+                const live = byName.get(item.name.trim().toLowerCase());
                 if (!live) continue;
 
                 // Re-classify modality from live library
                 modalities.add(live.modality as Modality);
 
-                // Re-classify movement family as a "pattern"
-                const liveAny = live as unknown as Record<string, unknown>;
-                const family = liveAny.family as string | undefined;
+                // Use stored family if available, else fall back to live library
+                const family = item.family ?? (live as unknown as Record<string, unknown>).family as string | undefined;
                 if (family) patterns.add(family);
             }
 
-            const ageHours =
-                (nowMs - new Date(w.date).getTime()) / (1000 * 60 * 60);
+            // Estimate ageHours from dateString + timeString
+            const dateStr = w.dateString as string | undefined;
+            const timeStr = w.timeString as string | undefined;
+            let sessionDate: Date;
+            if (dateStr && timeStr) {
+                // Parse DD/MM/YYYY and HH:MM
+                const [dd, mm, yyyy] = dateStr.split("/").map(Number);
+                const [hh, min] = timeStr.split(":").map(Number);
+                sessionDate = new Date(yyyy, mm - 1, dd, hh, min);
+            } else {
+                // Fallback to createdAt or now
+                sessionDate = w.createdAt ? new Date(w.createdAt) : now;
+            }
+            const ageHours = (nowMs - sessionDate.getTime()) / (1000 * 60 * 60);
 
             return {
-                date: w.date,
+                date: sessionDate,
                 movementNames,
                 patterns: Array.from(patterns),
                 modalities: Array.from(modalities),

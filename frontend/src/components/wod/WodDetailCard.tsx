@@ -13,7 +13,7 @@ export interface WodDetailCardProps {
     className?: string;
 }
 
-/** Detailed WOD display with and WodBlock. */
+/** Detailed WOD display with WodBlock. */
 export function WodDetailCard({
     wod,
     equipmentRequired = [],
@@ -30,16 +30,11 @@ export function WodDetailCard({
         >
             <div className="space-y-ds-4">
                 <WodBlock
-                    key={
-                        wod.movementItems?.length
-                            ? wod.movementItems.map((m) => m.name).join("\0")
-                            : wod.movements.join("\0")
-                    }
+                    key={wod.movementItems.map((m) => m.name).join("\0")}
                     type={wod.type}
                     durationMinutes={wod.duration ?? 0}
                     rounds={wod.rounds}
                     movementItems={wod.movementItems}
-                    movements={wod.movements}
                 />
                 {(equipmentPresetName || equipmentRequired.length > 0) && (
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">

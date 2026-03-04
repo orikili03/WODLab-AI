@@ -7,12 +7,6 @@ import { WodBlock } from "../components/wod/WodBlock";
 import { formatProtocol } from "../lib/formatters";
 import type { WorkoutResponse } from "../domains/workouts/api";
 
-function formatCompletionTime(seconds: number): string {
-    const m = Math.floor(seconds / 60);
-    const s = Math.round(seconds % 60);
-    return s < 10 ? `${m}:0${s}` : `${m}:${s}`;
-}
-
 function filterHistory(
     list: WorkoutResponse[],
     searchQuery: string,
@@ -25,12 +19,9 @@ function filterHistory(
     if (q) {
         out = out.filter((w) => {
             const type = (w.wod?.type ?? w.type ?? "").toLowerCase();
-            const desc = (w.wod?.description ?? "").toLowerCase();
-            const movements = (w.wod?.movements ?? []).join(" ").toLowerCase();
-            const warmup = (w.warmup ?? []).join(" ").toLowerCase();
-            const scaling = (w.scalingOptions ?? []).join(" ").toLowerCase();
-            const dateStr = new Date(w.date).toLocaleString().toLowerCase();
-            const searchable = [type, desc, movements, warmup, scaling, dateStr].join(" ");
+            const movements = (w.wod?.movementItems ?? []).map((m) => m.name).join(" ").toLowerCase();
+            const dateStr = (w.dateString ?? "").toLowerCase();
+            const searchable = [type, movements, dateStr].join(" ");
             return searchable.includes(q);
         });
     }
@@ -236,17 +227,14 @@ export function HistoryPage() {
                                         {(w.wod.duration ?? w.durationMinutes) != null && (w.wod.duration ?? w.durationMinutes) > 0 && (
                                             <> • {(w.wod.duration ?? w.durationMinutes)} min</>
                                         )}
-                                        {w.completed && (w.completionTime != null || (w.roundsOrReps != null && w.roundsOrReps > 0)) && (
+                                        {w.completedAt && w.scoreString && (
                                             <span className="text-ds-text-muted font-normal">
-                                                {" · "}
-                                                {w.completionTime != null && formatCompletionTime(w.completionTime)}
-                                                {w.completionTime != null && w.roundsOrReps != null && w.roundsOrReps > 0 && " · "}
-                                                {w.roundsOrReps != null && w.roundsOrReps > 0 && `${w.roundsOrReps} rds`}
+                                                {" · "}{w.scoreString}
                                             </span>
                                         )}
                                     </div>
                                     <p className="text-xs text-ds-text-muted">
-                                        {new Date(w.date).toLocaleDateString()} • {w.wod.movements.map(expandForDisplay).join(" / ")}
+                                        {w.dateString ?? ""} • {w.wod.movementItems.map((m) => expandForDisplay(m.name)).join(" / ")}
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
@@ -392,12 +380,7 @@ export function HistoryPage() {
                             <p className="text-center text-ds-body-sm text-ds-text mb-6">
                                 <strong>{formatProtocol(confirmDeleteWorkout.wod.type)}</strong>
                                 {" · "}
-                                {new Date(confirmDeleteWorkout.date).toLocaleDateString(undefined, {
-                                    weekday: "short",
-                                    year: "numeric",
-                                    month: "short",
-                                    day: "numeric",
-                                })}
+                                {confirmDeleteWorkout.dateString ?? ""}
                             </p>
 
                             <div className="flex gap-3">
@@ -477,13 +460,8 @@ export function HistoryPage() {
                                 </div>
                             </div>
                             <div className="mb-4 text-sm text-ds-text-muted">
-                                {new Date(viewWorkout.date).toLocaleDateString(undefined, {
-                                    weekday: "short",
-                                    year: "numeric",
-                                    month: "short",
-                                    day: "numeric",
-                                })}{" "}
-                                at {new Date(viewWorkout.date).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                                {viewWorkout.dateString ?? ""}{" "}
+                                at {viewWorkout.timeString ?? ""}
                             </div>
                             {viewWorkout.equipmentPresetName && (
                                 <p className="mb-4 text-ds-body-sm text-ds-text-muted">
@@ -497,19 +475,18 @@ export function HistoryPage() {
                                     durationMinutes={viewWorkout.wod.duration ?? viewWorkout.durationMinutes ?? 0}
                                     rounds={viewWorkout.wod.rounds}
                                     movementItems={viewWorkout.wod.movementItems}
-                                    movements={viewWorkout.wod.movements}
                                 />
                             </div>
 
-                            {viewWorkout.completed && (viewWorkout.completionTime != null || (viewWorkout.roundsOrReps != null && viewWorkout.roundsOrReps > 0)) && (
+                            {viewWorkout.completedAt && (
                                 <div className="rounded-ds-lg border border-ds-border bg-ds-surface-subtle p-4 space-y-2">
                                     <p className="text-xs uppercase tracking-wider text-ds-text-muted font-medium">Your result</p>
                                     <div className="flex flex-wrap gap-4 text-ds-text">
-                                        {viewWorkout.completionTime != null && (
-                                            <span><strong>Time</strong> {formatCompletionTime(viewWorkout.completionTime)}</span>
+                                        {viewWorkout.scoreString && (
+                                            <span><strong>Score</strong> {viewWorkout.scoreString}</span>
                                         )}
-                                        {viewWorkout.roundsOrReps != null && viewWorkout.roundsOrReps > 0 && (
-                                            <span><strong>Rounds</strong> {viewWorkout.roundsOrReps}</span>
+                                        {viewWorkout.rpe != null && (
+                                            <span><strong>RPE</strong> {viewWorkout.rpe}/5</span>
                                         )}
                                     </div>
                                 </div>

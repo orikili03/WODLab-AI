@@ -73,10 +73,6 @@ const userSchema = new Schema<IUser>(
         // --- Preferences ---
         workoutDuration: { type: Number, default: 15 },
         goals: { type: [String], default: [] },
-
-        //   { area: string, severity: "mild"|"moderate"|"severe",
-        //     notes?: string, dateReported: Date, active: boolean }
-        // ──────────────────────────────────────────────────────────
     },
     { timestamps: true }
 );

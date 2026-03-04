@@ -1,7 +1,7 @@
 // Temporary seed script — run once to populate test movements
 import "dotenv/config";
 import mongoose from "mongoose";
-import { Movement } from "./models/Movement.js";
+import { Movement } from "../models/Movement.js";
 
 const MONGODB_URI = process.env.MONGODB_URI!;
 

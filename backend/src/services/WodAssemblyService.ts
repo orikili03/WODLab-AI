@@ -3,6 +3,7 @@ import { movementScorer } from "./scoring/MovementScorer.js";
 import { repTarget } from "./scoring/repTarget.js";
 import type { HydratedContext } from "./scoring/WodHydrationService.js";
 import { dailySeed, SeededRng } from "../utils/seed.js";
+import type mongoose from "mongoose";
 
 // ─── WOD Template Types ───────────────────────────────────────────────────
 export type WodProtocol =
@@ -22,35 +23,42 @@ export type WodProtocol =
 export type WodCategory = "sprint" | "metcon" | "long";
 export type RepScheme = number[] | "MAX_REPS";
 
+// ─── Structured Quantity & Load ───────────────────────────────────────────
+export interface Quantity {
+    value: number;
+    unit: string;    // "reps" | "m" | "cal" | "sec"
+}
+
+export interface Load {
+    value: number;
+    unit: string;    // "kg" | "lb"
+}
+
+// ─── Movement Item (new structured format) ────────────────────────────────
+export interface AssembledMovementItem {
+    movementId?: mongoose.Types.ObjectId;
+    family?: string;
+    name: string;
+    quantity: Quantity;
+    load?: Load;
+    isMaxReps: boolean;
+}
+
+// ─── Assembled WOD (core structure saved to DB) ───────────────────────────
 export interface AssembledWod {
     type: string;
     protocol: WodProtocol;
     category: WodCategory;
     duration?: number;
-    description: string;
-    movements: string[];
     rounds?: number;
-    movementItems: Array<{
-        reps: number;
-        isMaxReps?: boolean;
-        name: string;
-        weight?: string;
-        distance?: string;
-    }>;
+    movementItems: AssembledMovementItem[];
     ladderType?: "ascending" | "descending" | "pyramid";
     scoringType?: "AMRAP" | "FOR_TIME";
 }
 
+// ─── Generated Workout (full output from assembly) ────────────────────────
 export interface GeneratedWorkout {
     wod: AssembledWod;
-    warmup: string[];
-    intensityGuidance: string;
-    intendedStimulus: string;
-    energySystem: string;
-    primaryStimulus: string;
-    timeDomain: string;
-    movementEmphasis: string[];
-    stimulusNote: string;
     equipmentPresetName?: string;
     equipmentUsed: string[];
 }
@@ -58,99 +66,31 @@ export interface GeneratedWorkout {
 // ─── Template Configuration ───────────────────────────────────────────────
 interface TemplateConfig {
     movementCount: { min: number; max: number };
-    description: (
-        duration: number,
-        movements: string[],
-        ladderType?: string,
-        scoringType?: string
-    ) => string;
 }
 
 const TEMPLATES: Record<WodProtocol, TemplateConfig> = {
-    AMRAP: {
-        movementCount: { min: 3, max: 4 },
-        description: (dur, mvs) => `${dur}-Minute AMRAP:\n${mvs.join("\n")}`,
-    },
-    EMOM: {
-        movementCount: { min: 2, max: 4 },
-        description: (dur, mvs) =>
-            `EMOM ${dur}:\n${mvs.map((m, i) => `Min ${i + 1}: ${m}`).join("\n")}`,
-    },
-    FOR_TIME: {
-        movementCount: { min: 2, max: 4 },
-        description: (dur, mvs, _lt, st) =>
-            st === "FOR_TIME"
-                ? `For Time (Cap ${dur} min):\n${mvs.join("\n")}`
-                : `For Time:\n${mvs.join("\n")}`,
-    },
-    TABATA: {
-        movementCount: { min: 2, max: 3 },
-        description: (_dur, mvs) =>
-            `Tabata (20s work / 10s rest × 8 rounds):\n${mvs.join("\n")}`,
-    },
-    DEATH_BY: {
-        movementCount: { min: 1, max: 2 },
-        description: (dur, mvs) =>
-            `Death By (Cap ${dur} min):\nStart with 1 rep. Add 1 rep each minute.\n${mvs.join("\n")}`,
-    },
-    "21_15_9": {
-        movementCount: { min: 2, max: 3 },
-        description: (_dur, mvs) => `21-15-9:\n${mvs.join("\n")}`,
-    },
-    LADDER: {
-        movementCount: { min: 1, max: 2 },
-        description: (dur, mvs, lt, st) => {
-            const prefix =
-                lt === "ascending"
-                    ? "Ascending"
-                    : lt === "descending"
-                        ? "Descending"
-                        : "Pyramid";
-            const suffix =
-                st === "AMRAP"
-                    ? `(${dur}-Minute Clock)`
-                    : `(For Time - Cap ${dur} min)`;
-            const details =
-                lt === "ascending"
-                    ? `Start with ${mvs.length > 1 ? "low reps" : "1 set"}. Increase reps every round.`
-                    : "Decrease reps every round.";
-            return `${prefix} Ladder ${suffix}:\n${details}\n${mvs.join("\n")}`;
-        },
-    },
-    CHIPPER: {
-        movementCount: { min: 4, max: 6 },
-        description: (_dur, mvs) =>
-            `Chipper (Complete in order):\n${mvs.join("\n")}`,
-    },
-    INTERVAL: {
-        movementCount: { min: 2, max: 3 },
-        description: (dur, mvs) =>
-            `Intervals (${dur} min total):\nComplete each round every 5 minutes.\n${mvs.join("\n")}`,
-    },
-    STRENGTH_SINGLE: {
-        movementCount: { min: 1, max: 1 },
-        description: (dur, mvs) =>
-            `Max Strength (${dur} min Window):\nFind a heavy 1-rep max for:\n${mvs.join("\n")}`,
-    },
-    STRENGTH_SETS: {
-        movementCount: { min: 1, max: 2 },
-        description: (dur, mvs) =>
-            `Strength Sets (${dur} min Window):\nWorking sets (Rest 2-3 mins):\n${mvs.join("\n")}`,
-    },
-    REST_DAY: {
-        movementCount: { min: 0, max: 0 },
-        description: () => "Rest Day: Active recovery or total rest.",
-    },
+    AMRAP: { movementCount: { min: 3, max: 4 } },
+    EMOM: { movementCount: { min: 2, max: 4 } },
+    FOR_TIME: { movementCount: { min: 2, max: 4 } },
+    TABATA: { movementCount: { min: 2, max: 3 } },
+    DEATH_BY: { movementCount: { min: 1, max: 2 } },
+    "21_15_9": { movementCount: { min: 2, max: 3 } },
+    LADDER: { movementCount: { min: 1, max: 2 } },
+    CHIPPER: { movementCount: { min: 4, max: 6 } },
+    INTERVAL: { movementCount: { min: 2, max: 3 } },
+    STRENGTH_SINGLE: { movementCount: { min: 1, max: 1 } },
+    STRENGTH_SETS: { movementCount: { min: 1, max: 2 } },
+    REST_DAY: { movementCount: { min: 0, max: 0 } },
 };
 
-// ─── Stimulus Metadata ────────────────────────────────────────────────────
+// ─── Stimulus Metadata (static — frontend looks up by protocol type) ──────
 interface StimulusMeta {
     energySystem: string;
     primaryStimulus: string;
-    stimulusNote: string;
+    stimulusNote: string;         // exposed to frontend via static import, NOT saved to DB
 }
 
-const STIMULUS_METADATA: Record<WodProtocol, StimulusMeta> = {
+export const STIMULUS_METADATA: Record<WodProtocol, StimulusMeta> = {
     AMRAP: {
         energySystem: "Glycolytic / Oxidative",
         primaryStimulus: "Sustained effort — manage the burn.",
@@ -225,14 +165,70 @@ const STIMULUS_METADATA: Record<WodProtocol, StimulusMeta> = {
     },
 };
 
-// ─── RPE Intensity Guidance ───────────────────────────────────────────────
-const INTENSITY_GUIDANCE: Record<WodCategory, string> = {
+// ─── RPE Intensity Guidance (static — frontend looks up by category) ──────
+export const INTENSITY_GUIDANCE: Record<WodCategory, string> = {
     sprint: "RPE 9-10: Max effort — leave nothing in the tank.",
     metcon: "RPE 7-8: Hard but sustainable — 2 reps in reserve.",
     long: "RPE 6-7: Conversational pace — protect the back half.",
 };
 
 // ─── Deterministic Seed Helpers relocated to src/utils/seed.ts ────────────
+
+// ─── Parsing Helpers (convert repTarget strings → structured objects) ─────
+
+/**
+ * Parses a repTarget distance string into a Quantity.
+ * Examples: "200 m" → { value: 200, unit: "m" }
+ *           "12/10 cal" → { value: 12, unit: "cal" }
+ *           "30 sec" → { value: 30, unit: "sec" }
+ *           "5-10-15 m" → { value: 5, unit: "m" } (takes the first number)
+ */
+function parseDistanceToQuantity(distance: string): Quantity {
+    const trimmed = distance.trim().toLowerCase();
+
+    // Handle "cal" ranges: "12/10 cal" → take first number
+    if (trimmed.includes("cal")) {
+        const numMatch = trimmed.match(/(\d+)/);
+        return { value: numMatch ? parseInt(numMatch[1], 10) : 0, unit: "cal" };
+    }
+
+    // Handle "sec": "30 sec" → { value: 30, unit: "sec" }
+    if (trimmed.includes("sec")) {
+        const numMatch = trimmed.match(/(\d+)/);
+        return { value: numMatch ? parseInt(numMatch[1], 10) : 0, unit: "sec" };
+    }
+
+    // Handle meters: "200 m", "5-10-15 m" → take first number
+    if (trimmed.includes("m")) {
+        const numMatch = trimmed.match(/(\d+)/);
+        return { value: numMatch ? parseInt(numMatch[1], 10) : 0, unit: "m" };
+    }
+
+    // Fallback: try to parse a plain number
+    const num = parseInt(trimmed, 10);
+    return { value: isNaN(num) ? 0 : num, unit: "reps" };
+}
+
+/**
+ * Parses a repTarget weight string into a Load.
+ * Examples: "50 kg" → { value: 50, unit: "kg" }
+ *           "135 lb" → { value: 135, unit: "lb" }
+ *           "RPE 7-8 (moderate-heavy)" → null (not a numeric load)
+ */
+function parseWeightToLoad(weight: string): Load | null {
+    const trimmed = weight.trim().toLowerCase();
+
+    // RPE descriptors are not numeric loads
+    if (trimmed.startsWith("rpe")) return null;
+
+    const kgMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*kg$/);
+    if (kgMatch) return { value: parseFloat(kgMatch[1]), unit: "kg" };
+
+    const lbMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*lb$/);
+    if (lbMatch) return { value: parseFloat(lbMatch[1]), unit: "lb" };
+
+    return null;
+}
 
 // ─── WodAssemblyService ───────────────────────────────────────────────────
 
@@ -292,15 +288,13 @@ export class WodAssemblyService {
         }
 
         // ── 4. Build movementItems using modality-aware repTarget ─────────
-        const movementItems = selected.map((fm) => {
+        const movementItems: AssembledMovementItem[] = selected.map((fm) => {
             const prescription = repTarget(fm.movement, context.fitnessLevel);
             let reps = prescription.reps;
 
             // Protocol-specific rep overrides
             if (protocol === "LADDER") {
-                // Ascending/Descending ladders should start at a low base
                 if (reps > 0) {
-                    // For cheap movements (Jump Rope/DU), start at 5-10
                     if (fm.movement.name.toLowerCase().includes("double under") ||
                         fm.movement.name.toLowerCase().includes("jump rope")) {
                         reps = 10;
@@ -309,50 +303,51 @@ export class WodAssemblyService {
                     }
                 }
             } else if (protocol === "DEATH_BY") {
-                // Death by always starts with 1
                 if (reps > 0) reps = 1;
             }
 
+            // ── Build structured quantity ──────────────────────────────────
+            let quantity: Quantity;
+            if (prescription.distance) {
+                quantity = parseDistanceToQuantity(prescription.distance);
+            } else {
+                quantity = { value: reps, unit: "reps" };
+            }
+
+            // ── Build structured load ─────────────────────────────────────
+            let load: Load | undefined;
+            if (prescription.weight) {
+                const parsed = parseWeightToLoad(prescription.weight);
+                if (parsed) load = parsed;
+            }
+
+            // ── Extract movement metadata ─────────────────────────────────
+            const movementDoc = fm.movement as unknown as Record<string, unknown>;
+            const movementId = movementDoc._id as mongoose.Types.ObjectId | undefined;
+            const family = typeof movementDoc.family === "string" ? movementDoc.family : undefined;
+
             return {
-                reps,
-                isMaxReps: false,
+                movementId,
+                family,
                 name: fm.resolvedName,
-                ...(prescription.distance !== undefined && { distance: prescription.distance }),
-                ...(prescription.weight !== undefined && { weight: prescription.weight }),
+                quantity,
+                load,
+                isMaxReps: false,
             };
         });
-
-        // ── 5. Build human-readable movement strings for description ──────
-        const movementStrings = movementItems.map((item) => {
-            if (item.distance) {
-                // e.g. "12/10 cal Row" or "200 m Run"
-                return `${item.distance} ${item.name}`;
-            }
-            let s = `${item.reps} ${item.name}`;
-            if (item.weight) s += ` (${item.weight})`;
-            return s;
-        });
-
-        // ── 6. Assemble WOD object ───────────────────────────────────────
+        // ── 5. Assemble WOD object ───────────────────────────────────────
         const wod: AssembledWod = {
             type: protocol,
             protocol,
             category,
             duration,
-            description: config.description(duration, movementStrings, ladderType, scoringType),
-            movements: selected.map((fm) => fm.movement.name),
+            rounds: protocol === "FOR_TIME" ? 1 : undefined,
             movementItems,
             ladderType,
             scoringType,
         };
 
-        // ── 7. Build metadata ────────────────────────────────────────────
-        const meta = STIMULUS_METADATA[protocol];
-        const movementEmphasis = Array.from(
-            new Set(selected.map((fm) => (fm.movement as unknown as { modality: string }).modality))
-        );
-        const timeDomain =
-            category === "sprint" ? "< 7m" : category === "metcon" ? "7-20m" : "20m+";
+        // ── 6. Build equipment metadata ───────────────────────────────
         const equipmentUsed = Array.from(
             new Set(
                 selected.flatMap(
@@ -363,16 +358,6 @@ export class WodAssemblyService {
 
         return {
             wod,
-            warmup: this.buildWarmup(category),
-            intensityGuidance: INTENSITY_GUIDANCE[category],
-            intendedStimulus: `${timeDomain} — ${movementEmphasis
-                .map((m) => (m === "G" ? "Gymnastics" : m === "W" ? "Weightlifting" : "Monostructural"))
-                .join(" + ")}`,
-            energySystem: meta.energySystem,
-            primaryStimulus: meta.primaryStimulus,
-            timeDomain,
-            movementEmphasis,
-            stimulusNote: meta.stimulusNote,
             equipmentPresetName: presetName,
             equipmentUsed,
         };
@@ -423,7 +408,6 @@ export class WodAssemblyService {
             // Bias durations toward user's workoutDuration preference
             const durations = [8, 10, 12, 15, 18, 20];
             const preferred = preferredDuration || 15;
-            // Pick the available duration closest to preference
             const duration = durations.reduce((prev, curr) =>
                 Math.abs(curr - preferred) < Math.abs(prev - preferred) ? curr : prev
             );
@@ -472,7 +456,6 @@ export class WodAssemblyService {
     }
 
     private weightedPick<T>(options: Array<{ p: T; w: number }>, rng: SeededRng): T {
-        // Shuffle the options to prevent positional bias (e.g. always hitting the last item)
         const shuffled = this.shuffle(options, rng);
         const total = shuffled.reduce((s, o) => s + o.w, 0);
         let r = rng.next() * total;
@@ -481,30 +464,6 @@ export class WodAssemblyService {
             r -= o.w;
         }
         return shuffled[0].p;
-    }
-
-    private buildWarmup(category: WodCategory): string[] {
-        if (category === "sprint") {
-            return [
-                "3 min easy movement (jog / row / bike)",
-                "10 arm circles each direction",
-                "10 air squats + 10 hip circles",
-                "Movement-specific activation — 2 rounds light",
-            ];
-        }
-        if (category === "long") {
-            return [
-                "6 min easy cardio (nasal breathing)",
-                "2 rounds: 10 air squats, 10 shoulder pass-throughs, 10 leg swings",
-                "Movement-specific warm-up sets at 50% load",
-            ];
-        }
-        // metcon default
-        return [
-            "4 min easy cardio",
-            "2 rounds: 10 push-ups, 10 air squats, 8 ring rows",
-            "Movement-specific primer — 2 light rounds",
-        ];
     }
 }
 

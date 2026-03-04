@@ -2,9 +2,10 @@ import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
 
-// ─── Evolution-Friendly Auth Guard ────────────────────────────────────────
-// Reads JWT from HttpOnly cookie first, then Authorization header as fallback.
-// Cookie-based auth prevents XSS token theft; header fallback supports API tools.
+// ─── Auth Guard ───────────────────────────────────────────────────────────
+// Reads JWT exclusively from HttpOnly cookie.
+// Single-service deployment (backend serves frontend) makes cookies first-party,
+// eliminating the need for a localStorage/Bearer fallback.
 // ──────────────────────────────────────────────────────────────────────────
 
 export const AUTH_COOKIE_NAME = "wodlab_session";
@@ -24,16 +25,7 @@ declare global {
 }
 
 export function authGuard(req: Request, res: Response, next: NextFunction): void {
-    // 1. Try HttpOnly cookie first (secure, browser-based flow)
-    let token: string | undefined = req.cookies?.[AUTH_COOKIE_NAME];
-
-    // 2. Fallback to Authorization header (API tools, mobile, etc.)
-    if (!token) {
-        const header = req.headers.authorization;
-        if (header && header.startsWith("Bearer ")) {
-            token = header.slice(7);
-        }
-    }
+    const token: string | undefined = req.cookies?.[AUTH_COOKIE_NAME];
 
     if (!token) {
         res.status(401).json({ error: "Authentication required" });
@@ -63,8 +55,8 @@ export function signToken(userId: string, email: string): string {
 export function setAuthCookie(res: Response, token: string): void {
     res.cookie(AUTH_COOKIE_NAME, token, {
         httpOnly: true,
-        secure: true,
-        sameSite: "none",
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
         maxAge: 7 * 24 * 60 * 60 * 1000,
         path: "/",
     });
@@ -76,8 +68,8 @@ export function setAuthCookie(res: Response, token: string): void {
 export function clearAuthCookie(res: Response): void {
     res.clearCookie(AUTH_COOKIE_NAME, {
         httpOnly: true,
-        secure: true,
-        sameSite: "none",
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
         path: "/",
     });
 }

@@ -4,7 +4,7 @@ import { CheckCircle, Clock, Layers, ChevronRight } from "lucide-react";
 import { useCompleteWorkout } from "../../domains/workouts/hooks";
 import { formatTime } from "../../domains/timer/utils";
 import type { WorkoutSessionResult } from "../../domains/timer/api";
-import type { WorkoutResponse, WorkoutSpec } from "../../domains/workouts/api";
+import type { WorkoutResponse } from "../../domains/workouts/api";
 import { Button } from "../ui";
 import { cn } from "../../lib/utils";
 import { formatProtocol } from "../../lib/formatters";
@@ -16,30 +16,33 @@ interface WorkoutSummaryProps {
 }
 
 export function WorkoutSummary({ workout, result, onClose }: WorkoutSummaryProps) {
-    const [rpe, setRpe] = useState(8);
+    const [rpe, setRpe] = useState(3);
     const completeMutation = useCompleteWorkout();
     const queryClient = useQueryClient();
 
+    // Build a human-readable score string from the session result
+    const buildScoreString = (): string | undefined => {
+        if (result.roundsCompleted > 0) {
+            return `${result.roundsCompleted} rounds`;
+        }
+        return undefined;
+    };
+
+    // Calculate total reps equivalent for scoreValue
+    const buildScoreValue = (): number | undefined => {
+        if (result.roundsCompleted > 0) {
+            return result.roundsCompleted;
+        }
+        return Math.round(result.totalElapsed);  // seconds as fallback for FOR_TIME
+    };
+
     const handleSave = () => {
-        const spec: WorkoutSpec = {
-            warmup: workout.warmup ?? [],
-            wod: workout.wod,
-            scalingOptions: workout.scalingOptions ?? [],
-            intensityGuidance: workout.intensityGuidance ?? "",
-            finisher: workout.finisher,
-            intendedStimulus: workout.intendedStimulus,
-            timeDomain: workout.timeDomain,
-            movementEmphasis: workout.movementEmphasis,
-            stimulusNote: workout.stimulusNote,
-            ...(workout.equipmentPresetName != null && { equipmentPresetName: workout.equipmentPresetName }),
-            ...(workout.equipmentUsed != null && { equipmentUsed: workout.equipmentUsed }),
-        };
         completeMutation.mutate(
             {
                 workoutId: workout.id,
-                completionTime: Math.round(result.totalElapsed),
-                roundsOrReps: result.roundsCompleted > 0 ? result.roundsCompleted : undefined,
-                spec,
+                scoreValue: buildScoreValue(),
+                scoreString: buildScoreString(),
+                rpe,
             },
             {
                 onSuccess: () => {
@@ -49,6 +52,11 @@ export function WorkoutSummary({ workout, result, onClose }: WorkoutSummaryProps
             }
         );
     };
+
+    // Build a display summary from the WOD data
+    const movementSummary = workout.wod.movementItems
+        .map((item) => item.name)
+        .join(" / ");
 
     return (
         <div
@@ -62,7 +70,7 @@ export function WorkoutSummary({ workout, result, onClose }: WorkoutSummaryProps
                 </div>
                 <h2 className="text-2xl font-bold text-amber-400">Workout Complete!</h2>
                 <p className="text-sm text-ds-text-muted">
-                    {formatProtocol(workout.wod.type)} · {workout.wod.description}
+                    {formatProtocol(workout.wod.type)} · {movementSummary}
                 </p>
             </div>
 
@@ -82,7 +90,7 @@ export function WorkoutSummary({ workout, result, onClose }: WorkoutSummaryProps
                 )}
             </div>
 
-            {/* RPE slider */}
+            {/* RPE slider (1-5 scale) */}
             <div className="w-full card">
                 <h3 className="text-xs uppercase tracking-widest text-ds-text-muted mb-3">
                     How hard was it?
@@ -91,7 +99,7 @@ export function WorkoutSummary({ workout, result, onClose }: WorkoutSummaryProps
                     <input
                         type="range"
                         min={1}
-                        max={10}
+                        max={5}
                         step={1}
                         value={rpe}
                         onChange={(e) => setRpe(Number(e.target.value))}

@@ -77,8 +77,8 @@ describe("WOD Engine Monte Carlo Simulation", () => {
                 dayModalities = [];
                 dayFamilies = [];
 
-                for (const name of generated.wod.movements) {
-                    const libraryRef = allMovements.find(m => m.name === name);
+                for (const item of generated.wod.movementItems) {
+                    const libraryRef = allMovements.find(m => m.name === item.name);
                     if (libraryRef) {
                         dayModalities.push(libraryRef.modality as Modality);
                         if (libraryRef.family) dayFamilies.push(libraryRef.family);
@@ -99,8 +99,8 @@ describe("WOD Engine Monte Carlo Simulation", () => {
             }
 
             // Check equipment violation
-            for (const item of generated.wod.movements) {
-                const libEq = allMovements.find(m => m.name === item)?.equipmentRequired ?? [];
+            for (const item of generated.wod.movementItems) {
+                const libEq = allMovements.find(m => m.name === item.name)?.equipmentRequired ?? [];
                 if (libEq.length > 0) {
                     const hasAll = libEq.every(eq => MOCK_ATHLETE.equipment.includes(eq));
                     if (!hasAll) {

@@ -9,7 +9,6 @@ import type { AuthUser } from './AuthTokenContext';
  */
 type AuthResponse = {
     user: AuthUser;
-    token?: string; // Token returned for header-based auth fallback
 };
 
 /**
@@ -24,7 +23,7 @@ export function useLogin(): UseMutationResult<AuthResponse, Error, { email: stri
             return response.data;
         },
         onSuccess: (data) => {
-            onLoginSuccess(data.user, data.token);
+            onLoginSuccess(data.user);
         },
     });
 }
@@ -41,7 +40,7 @@ export function useRegister(): UseMutationResult<AuthResponse, Error, { email: s
             return response.data;
         },
         onSuccess: (data) => {
-            onLoginSuccess(data.user, data.token);
+            onLoginSuccess(data.user);
         },
     });
 }
