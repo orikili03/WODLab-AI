@@ -34,8 +34,6 @@ async function extract() {
         const categoryCounts: Record<string, number> = {};
         const durationList: number[] = [];
         const movementFreq: Record<string, number> = {};
-        const patternFreq: Record<string, number> = {};
-        const modalityFreq: Record<string, number> = {};
         const dayDetails: any[] = [];
 
         for (const w of workouts) {
