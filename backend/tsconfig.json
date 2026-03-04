@@ -3,6 +3,9 @@
         "target": "ES2022",
         "module": "ESNext",
         "moduleResolution": "node",
+        "types": [
+            "node"
+        ],
         "outDir": "dist",
         "rootDir": "src",
         "strict": true,
@@ -21,6 +24,7 @@
     ],
     "exclude": [
         "node_modules",
-        "dist"
+        "dist",
+        "**/*.test.ts"
     ]
 }
