@@ -1,0 +1,4 @@
+interface:
+  display_name: "CrossFit Programmer"
+  short_description: "Personalized WOD generation and scaling"
+  default_prompt: "Use $crossfit-programmer to create a 45-minute WOD using my equipment and my last 3 training days. Movements in each piece must work together and share setup. Only use bar-facing burpees when a barbell movement is in that same piece."

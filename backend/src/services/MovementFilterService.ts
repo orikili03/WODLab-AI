@@ -17,6 +17,8 @@ export interface MovementFilterInput {
     family?: string;
     /** Optional: require specific stimulus tag */
     stimulusTag?: string;
+    /** Optional: restrict to specific difficulty band */
+    difficulty?: string;
 }
 
 // ─── Filter Result ────────────────────────────────────────────────────────
@@ -58,7 +60,10 @@ export class MovementFilterService {
             // 3. Stimulus filter
             if (input.stimulusTag && !m.stimulusTags.includes(input.stimulusTag as any)) return false;
 
-            // 4. Bodyweight-only filter
+            // 4. Difficulty filter
+            if (input.difficulty && m.difficulty !== input.difficulty) return false;
+
+            // 5. Bodyweight-only filter
             if (input.bodyweightOnly && !m.bodyweightOnly) return false;
 
             // 5. Equipment Check

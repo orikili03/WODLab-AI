@@ -1,0 +1,31 @@
+{
+  "goal": "mixed",
+  "fitness_level": "intermediate",
+  "session_minutes": 45,
+  "equipment_available": [
+    "none",
+    "barbell",
+    "plates",
+    "pull-up-bar",
+    "jump-rope",
+    "rower",
+    "box",
+    "wall-ball",
+    "dumbbell"
+  ],
+  "limitations": {
+    "avoid_patterns": [
+      "high-volume-overhead"
+    ],
+    "avoid_movements": [
+      "GHD Sit-up"
+    ]
+  },
+  "preferred_modalities": [
+    "monostructural",
+    "gymnastics",
+    "weightlifting"
+  ],
+  "wod_type": "amrap",
+  "intensity": "moderate"
+}

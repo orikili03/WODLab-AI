@@ -1,21 +1,28 @@
 import mongoose, { Schema, type Document } from "mongoose";
 
 // ─── CrossFit Modalities ──────────────────────────────────────────────────
-export const MODALITIES = ["G", "W", "M"] as const; // Gymnastics, Weightlifting, Monostructural
+export const MODALITIES = ["G", "W", "M"] as const; // G=Gymnastics, W=Weightlifting+OddObject, M=Monostructural
 export type Modality = (typeof MODALITIES)[number];
+
+// ─── Movement Difficulty Tiers ────────────────────────────────────────────
+export const DIFFICULTY_LEVELS = ["beginner", "intermediate", "advanced", "elite"] as const;
+export type DifficultyLevel = (typeof DIFFICULTY_LEVELS)[number];
 
 // ─── 10 General Physical Skills (CrossFit L1 Manual) ──────────────────────
 export const STIMULUS_TAGS = [
     "strength",
     "power",
     "endurance",
-    "skill",
     "stamina",
     "flexibility",
+    "speed",
     "coordination",
     "agility",
     "balance",
     "accuracy",
+    "skill",
+    "engine",
+    "recovery"
 ] as const;
 export type StimulusTag = (typeof STIMULUS_TAGS)[number];
 
@@ -45,7 +52,10 @@ export interface IMovement extends Document {
     name: string;
     abbreviation?: string;
     modality: Modality;
+    difficulty?: DifficultyLevel;      // 4-tier: beginner | intermediate | advanced | elite
     stimulusTags: StimulusTag[];
+    effects?: string[];                 // Coach-level effect tags: "engine", "mental", "stability"…
+    patterns?: string[];                // Multi-pattern array: ["hinge", "posterior-chain", "grip"]
     equipmentRequired: string[];
     bodyweightOnly: boolean;
     family?: string;
@@ -68,14 +78,17 @@ const movementSchema = new Schema<IMovement>(
 
         // --- CrossFit Classification ---
         modality: { type: String, enum: MODALITIES, required: true },
-        stimulusTags: [{ type: String, enum: STIMULUS_TAGS }],
+        difficulty: { type: String, enum: DIFFICULTY_LEVELS }, // 4-tier difficulty
+        stimulusTags: [{ type: String }],
+        effects: [{ type: String }],    // Coach effect tags: "engine", "mental", "stability"…
+        patterns: [{ type: String }],   // Multi-pattern: ["hinge", "posterior-chain", "grip"]
 
         // --- Equipment Requirements ---
         equipmentRequired: [{ type: String }], // IDs match frontend EQUIPMENT_CATALOG
         bodyweightOnly: { type: Boolean, default: false },
 
         // --- Movement Family & Variants ---
-        family: { type: String, trim: true }, // e.g. "squat", "press", "pull", "hinge"
+        family: { type: String, trim: true }, // primary pattern: "squat", "press", "pull", "hinge"
         variants: [{ type: String }],
         progressions: [progressionSchema], // skill ladder per fitness level
 
@@ -92,6 +105,7 @@ const movementSchema = new Schema<IMovement>(
 
 // ─── Indexes for Rules Engine queries ─────────────────────────────────────
 movementSchema.index({ modality: 1 });
+movementSchema.index({ difficulty: 1 });
 movementSchema.index({ family: 1 });
 movementSchema.index({ equipmentRequired: 1 });
 movementSchema.index({ "progressions.level": 1 });

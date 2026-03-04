@@ -1,0 +1,15 @@
+{
+  "name": "crossfit-programmer",
+  "version": "1.0.0",
+  "description": "Deterministic CrossFit WOD generator skill",
+  "license": "MIT",
+  "type": "commonjs",
+  "scripts": {
+    "generate:wod": "node scripts/generate_wod.js",
+    "generate:wod:sample": "node scripts/generate_wod.js --profile-file references/sample-profile.json --history-file references/sample-history.json",
+    "generate:wod:sample:json": "node scripts/generate_wod.js --profile-file references/sample-profile.json --history-file references/sample-history.json --output json"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,7 +1,5 @@
-import { Workout } from "../models/Workout.js";
-// Movement model types are accessed via cache service
-import { movementCacheService } from "./MovementCacheService.js";
 import type { FilteredMovement } from "./MovementFilterService.js";
+import type { HydratedContext } from "./scoring/WodHydrationService.js";
 
 // ─── Variance Analysis Result ─────────────────────────────────────────────
 export interface VarianceAnalysis {
@@ -19,107 +17,59 @@ export interface VarianceAnalysis {
  * VarianceCheckerService
  *
  * Implements the CrossFit "Constantly Varied" principle:
- * - Analyzes the last N workouts to detect patterns
+ * - Derives variance from WodHydrationService context (zero extra DB cost)
  * - Identifies overused movement families (avoid squat→squat)
  * - Tracks modality balance (G/W/M) to suggest underrepresented areas
  * - Scores candidate movements by "freshness" for better variance
+ *
+ * NOTE: The legacy `analyze(userId)` method that hit the DB directly has been
+ * removed. All callers must pass a pre-fetched `HydratedContext` from
+ * `WodHydrationService` via `analyzeFromContext()`.
  */
 export class VarianceCheckerService {
-    /** How many past workouts to analyze for variance */
-    private readonly LOOKBACK_DAYS = 3;
-    private readonly MAX_LOOKBACK_WORKOUTS = 5;
 
     /**
-     * Analyze recent workout history for a user.
+     * Derive a VarianceAnalysis from a pre-fetched HydratedContext.
+     *
+     * Zero-DB-cost: builds the same output as the old analyze() using the
+     * already-hydrated history from WodHydrationService. The route fetches
+     * the context once and passes it here — no second DB round-trip.
      */
-    async analyze(userId: string): Promise<VarianceAnalysis> {
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - this.LOOKBACK_DAYS);
-
-        // Fetch recent workouts
-        const recentWorkouts = await Workout.find({
-            userId,
-            date: { $gte: cutoff },
-        })
-            .sort({ date: -1 })
-            .limit(this.MAX_LOOKBACK_WORKOUTS)
-            .lean();
-
-        // Extract movement names from recent WODs using movementItems (cleaner than parsing strings)
-        const recentMovementNames = new Set<string>();
-        for (const w of recentWorkouts) {
-            if (w.wod.movementItems) {
-                for (const item of w.wod.movementItems) {
-                    recentMovementNames.add(item.name.trim());
-                }
-            } else {
-                // FALLBACK: Improve "Lossy" parsing for legacy/manual entries
-                // Instead of regex, we'll check if any movement name/abbreviation exists within the string
-                const allLibraryMovements = await movementCacheService.getAll();
-                for (const mStr of w.wod.movements) {
-                    const normalized = mStr.toLowerCase();
-                    const match = allLibraryMovements.find(lim =>
-                        normalized.includes(lim.name.toLowerCase()) ||
-                        (lim.abbreviation && normalized.includes(lim.abbreviation.toLowerCase()))
-                    );
-                    if (match) {
-                        recentMovementNames.add(match.name);
-                    }
-                }
-            }
-        }
-
-        if (recentMovementNames.size === 0) {
+    async analyzeFromContext(context: HydratedContext): Promise<VarianceAnalysis> {
+        // Cold start — no history available
+        if (context.isColdStart || context.history.length === 0) {
             return {
                 recentFamilies: [],
                 recentModalities: [],
                 suggestedModality: null,
-                lookbackCount: recentWorkouts.length,
+                lookbackCount: 0,
             };
         }
 
-        // Look up movement families and modalities from the Movement collection
-        // Since we have the full library in memory, we can robustly match variants
-        const allMovements = await movementCacheService.getAll();
-        const movements = allMovements.filter((m) => {
-            // Check if the base name, any variant, or any progression name matches
-            const nameMatch = recentMovementNames.has(m.name);
-            const variantMatch = m.variants?.some((v) => recentMovementNames.has(v));
-            const progressionMatch = m.progressions?.some((p) =>
-                recentMovementNames.has(p.variant)
-            );
-            return nameMatch || variantMatch || progressionMatch;
-        });
-
+        // Union of all patterns and modalities across all sessions
         const recentFamilies = [
-            ...new Set(movements.map((m) => m.family).filter(Boolean) as string[]),
+            ...new Set(context.history.flatMap((s) => s.patterns)),
         ];
         const recentModalities = [
-            ...new Set(movements.map((m) => m.modality).filter(Boolean) as string[]),
+            ...new Set(context.history.flatMap((s) => s.modalities)),
         ];
 
-        // Determine which modality is underrepresented
+        // Count modality occurrences to find least-represented
         const modalityCounts: Record<string, number> = { G: 0, W: 0, M: 0 };
-        for (const m of movements) {
-            if (m.modality in modalityCounts) {
-                modalityCounts[m.modality]++;
+        for (const session of context.history) {
+            for (const mod of session.modalities) {
+                modalityCounts[mod] = (modalityCounts[mod] ?? 0) + 1;
             }
         }
 
-        // Suggest the least-used modality (or null if no history)
-        let suggestedModality: string | null = null;
-        if (recentWorkouts.length > 0) {
-            const sorted = Object.entries(modalityCounts).sort(
-                ([, a], [, b]) => a - b
-            );
-            suggestedModality = sorted[0][0];
-        }
+        const sorted = Object.entries(modalityCounts).sort(([, a], [, b]) => a - b);
+        const suggestedModality = sorted[0][0];
 
         return {
             recentFamilies,
             recentModalities,
             suggestedModality,
-            lookbackCount: recentWorkouts.length,
+            lookbackCount: context.history.length,
         };
     }
 

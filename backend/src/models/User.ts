@@ -36,6 +36,7 @@ export interface IUser extends Document {
             selected: Array<{ id: string; minWeight?: number; maxWeight?: number }>;
         }>;
     };
+    workoutDuration: number; // preferred metcon duration in minutes
     goals: string[];
     createdAt: Date;
     updatedAt: Date;
@@ -69,7 +70,8 @@ const userSchema = new Schema<IUser>(
             customPresets: { type: [customPresetSchema], default: [] },
         },
 
-        // --- Goals (placeholder for future) ---
+        // --- Preferences ---
+        workoutDuration: { type: Number, default: 15 },
         goals: { type: [String], default: [] },
 
         // ─── Future Evolution Notes ───────────────────────────────

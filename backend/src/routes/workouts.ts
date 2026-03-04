@@ -6,6 +6,7 @@ import { authGuard } from "../middleware/auth.js";
 import { movementFilterService } from "../services/MovementFilterService.js";
 import { varianceCheckerService } from "../services/VarianceCheckerService.js";
 import { wodAssemblyService } from "../services/WodAssemblyService.js";
+import { wodHydrationService } from "../services/scoring/WodHydrationService.js";
 import type { FitnessLevel } from "../models/User.js";
 
 const router = Router();
@@ -19,6 +20,7 @@ const generateSchema = z.object({
     equipment: z.array(z.string()),
     injuries: z.string().optional(),
     presetName: z.string().optional(),
+    salt: z.string().optional(),
 });
 
 // ─── POST /workouts/generate ──────────────────────────────────────────────
@@ -27,10 +29,10 @@ router.post("/generate", async (req, res) => {
     try {
         const payload = generateSchema.parse(req.body);
 
-        // 1. Fetch user and variance analysis in parallel (the two main DB hits)
-        const [user, variance] = await Promise.all([
+        // 1. Fetch user AND athlete coaching context in parallel (single DB round-trip for history)
+        const [user, athleteContext] = await Promise.all([
             User.findById(req.userId).lean(),
-            varianceCheckerService.analyze(req.userId!)
+            wodHydrationService.fetch(req.userId!)
         ]);
 
         if (!user) {
@@ -38,7 +40,10 @@ router.post("/generate", async (req, res) => {
             return;
         }
 
-        // 2. Filter movements by equipment + fitness level (mostly in-memory now)
+        // 2. Derive variance analysis from the already-fetched context (zero extra DB cost)
+        const variance = await varianceCheckerService.analyzeFromContext(athleteContext);
+
+        // 3. Filter movements by equipment + fitness level (in-memory, cached)
         const filtered = await movementFilterService.filter({
             availableEquipment: payload.equipment,
             fitnessLevel: user.fitnessLevel as FitnessLevel,
@@ -53,17 +58,21 @@ router.post("/generate", async (req, res) => {
             return;
         }
 
-        // 3. Rank movements by freshness (deprioritize recently-used families)
+        // 4. Rank movements by freshness (deprioritize recently-used families)
         const ranked = varianceCheckerService.rankByVariance(filtered, variance);
 
-        // 4. Assemble the WOD using the template engine
-        const generated = wodAssemblyService.assemble(
+        // 5. Assemble the WOD using the deterministic Coach Engine
+        const generated = await wodAssemblyService.assemble(
             ranked,
             payload.category,
-            payload.presetName
+            athleteContext,
+            req.userId!,
+            payload.equipment,
+            payload.presetName,
+            payload.salt || ""
         );
 
-        // 6. Save to workout history (including new stimulus metadata)
+        // 6. Save to workout history
         const workout = await Workout.create({
             userId: req.userId,
             date: new Date(),

@@ -1,0 +1,41 @@
+[
+  {
+    "date": "2026-02-20",
+    "movements": [
+      "Back Squat",
+      "Wall Ball Shot",
+      "Run"
+    ],
+    "patterns": [
+      "squat",
+      "knee-dominant"
+    ],
+    "intensity": "high"
+  },
+  {
+    "date": "2026-02-19",
+    "movements": [
+      "Push Press",
+      "Toes-to-Bar",
+      "Double Under"
+    ],
+    "patterns": [
+      "vertical-push",
+      "core",
+      "coordination"
+    ],
+    "intensity": "moderate"
+  },
+  {
+    "date": "2026-02-18",
+    "movements": [
+      "Deadlift",
+      "Burpee"
+    ],
+    "patterns": [
+      "hinge",
+      "full-body"
+    ],
+    "intensity": "high"
+  }
+]

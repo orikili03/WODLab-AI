@@ -1,0 +1,734 @@
+{
+  "version": "1.0.0",
+  "movements": [
+    {
+      "name": "Run",
+      "modality": "monostructural",
+      "difficulty": "beginner",
+      "equipment": ["none"],
+      "patterns": ["cyclical", "aerobic", "knee-dominant"],
+      "effects": ["engine", "stamina", "recovery"],
+      "variations": ["Easy nasal-breathing run", "Tempo run", "Hill run", "Weighted vest run", "Shuttle run repeats"]
+    },
+    {
+      "name": "Sprint Run",
+      "modality": "monostructural",
+      "difficulty": "intermediate",
+      "equipment": ["none"],
+      "patterns": ["cyclical", "anaerobic", "power"],
+      "effects": ["power", "speed", "engine"],
+      "variations": ["40 m accelerations", "100 m repeats", "200 m repeats", "Up-hill sprint", "Build sprint"]
+    },
+    {
+      "name": "Shuttle Run",
+      "modality": "monostructural",
+      "difficulty": "beginner",
+      "equipment": ["none"],
+      "patterns": ["cyclical", "lateral", "change-of-direction"],
+      "effects": ["engine", "agility", "stamina"],
+      "variations": ["5-10-15 m shuttle", "20 m shuttle", "Suicides", "Reactive shuttle", "Partner chase shuttle"]
+    },
+    {
+      "name": "Row",
+      "modality": "monostructural",
+      "difficulty": "beginner",
+      "equipment": ["rower"],
+      "patterns": ["cyclical", "hinge", "pull"],
+      "effects": ["engine", "stamina", "power"],
+      "variations": ["Steady state row", "Calorie row intervals", "Distance row", "Stroke-rate ladder", "Damper technique row"]
+    },
+    {
+      "name": "Bike Erg",
+      "modality": "monostructural",
+      "difficulty": "beginner",
+      "equipment": ["bike"],
+      "patterns": ["cyclical", "knee-dominant"],
+      "effects": ["engine", "stamina", "recovery"],
+      "variations": ["Easy flush bike", "Sprint bike", "RPM ladder", "Threshold bike", "Bike standing surge"]
+    },
+    {
+      "name": "Assault Bike",
+      "modality": "monostructural",
+      "difficulty": "intermediate",
+      "equipment": ["bike"],
+      "patterns": ["cyclical", "full-body"],
+      "effects": ["engine", "power", "mental"],
+      "variations": ["10/20 second repeats", "Max-cal sprint", "Negative split effort", "Bike tabata", "Long interval bike"]
+    },
+    {
+      "name": "SkiErg",
+      "modality": "monostructural",
+      "difficulty": "intermediate",
+      "equipment": ["skierg"],
+      "patterns": ["cyclical", "hinge", "vertical-pull"],
+      "effects": ["engine", "stamina", "upper-body-endurance"],
+      "variations": ["Steady ski", "Calorie sprints", "Double-pole focus", "Rate-control ski", "Alternating-arm ski"]
+    },
+    {
+      "name": "Jump Rope Single",
+      "modality": "monostructural",
+      "difficulty": "beginner",
+      "equipment": ["jump-rope"],
+      "patterns": ["cyclical", "coordination", "elasticity"],
+      "effects": ["engine", "coordination", "recovery"],
+      "variations": ["Single unders", "Alternating foot single unders", "High-knee singles", "Side-to-side singles", "Fast cadence singles"]
+    },
+    {
+      "name": "Double Under",
+      "modality": "monostructural",
+      "difficulty": "advanced",
+      "equipment": ["jump-rope"],
+      "patterns": ["cyclical", "coordination", "elasticity"],
+      "effects": ["engine", "coordination", "skill"],
+      "variations": ["Single-single-double", "Unbroken double unders", "Cross-over double under", "Alternating double under", "Double under speed sets"]
+    },
+    {
+      "name": "Swim",
+      "modality": "monostructural",
+      "difficulty": "intermediate",
+      "equipment": ["pool"],
+      "patterns": ["cyclical", "aerobic", "upper-pull"],
+      "effects": ["engine", "recovery", "stamina"],
+      "variations": ["Freestyle easy", "Freestyle interval", "Pull buoy swim", "Kickboard swim", "Open-water tempo"]
+    },
+    {
+      "name": "Air Squat",
+      "modality": "gymnastics",
+      "difficulty": "beginner",
+      "equipment": ["none"],
+      "patterns": ["squat", "knee-dominant"],
+      "effects": ["stamina", "volume", "skill"],
+      "variations": ["Tempo air squat", "Pause air squat", "Prisoner squat", "Heels-elevated squat", "Jumping air squat"]
+    },
+    {
+      "name": "Pistol Squat",
+      "modality": "gymnastics",
+      "difficulty": "advanced",
+      "equipment": ["none"],
+      "patterns": ["single-leg", "squat", "balance"],
+      "effects": ["strength", "skill", "coordination"],
+      "variations": ["Box-assisted pistol", "Counterweight pistol", "Tempo pistol", "Alternating pistols", "Deficit pistol"]
+    },
+    {
+      "name": "Walking Lunge",
+      "modality": "gymnastics",
+      "difficulty": "beginner",
+      "equipment": ["none"],
+      "patterns": ["single-leg", "knee-dominant"],
+      "effects": ["stamina", "volume", "balance"],
+      "variations": ["Forward lunge", "Reverse lunge", "Overhead lunge", "Lateral lunge", "Deficit lunge"]
+    },
+    {
+      "name": "Box Jump",
+      "modality": "gymnastics",
+      "difficulty": "intermediate",
+      "equipment": ["box"],
+      "patterns": ["plyometric", "knee-dominant", "power"],
+      "effects": ["power", "coordination", "stamina"],
+      "variations": ["Step-down box jump", "Rebound box jump", "Seated box jump", "Lateral box jump", "Box jump over"]
+    },
+    {
+      "name": "Box Step-Up",
+      "modality": "gymnastics",
+      "difficulty": "beginner",
+      "equipment": ["box"],
+      "patterns": ["single-leg", "knee-dominant"],
+      "effects": ["stamina", "recovery", "balance"],
+      "variations": ["Alternating step-up", "Front rack step-up", "Lateral step-up", "High box step-up", "Tempo step-up"]
+    },
+    {
+      "name": "Burpee",
+      "modality": "gymnastics",
+      "difficulty": "intermediate",
+      "equipment": ["none"],
+      "patterns": ["full-body", "press", "squat"],
+      "effects": ["engine", "mental", "stamina"],
+      "variations": ["No-pushup burpee", "Strict burpee", "Lateral burpee", "Bar-facing burpee", "Burpee broad jump"]
+    },
+    {
+      "name": "Burpee Box Jump Over",
+      "modality": "gymnastics",
+      "difficulty": "advanced",
+      "equipment": ["box"],
+      "patterns": ["full-body", "plyometric", "coordination"],
+      "effects": ["engine", "power", "mental"],
+      "variations": ["Step-over version", "Jump-over version", "Lateral version", "No-touch burpee version", "Tall box version"]
+    },
+    {
+      "name": "Push-up",
+      "modality": "gymnastics",
+      "difficulty": "beginner",
+      "equipment": ["none"],
+      "patterns": ["horizontal-push", "core"],
+      "effects": ["strength", "stamina", "volume"],
+      "variations": ["Incline push-up", "Strict push-up", "Tempo push-up", "Deficit push-up", "Hand-release push-up"]
+    },
+    {
+      "name": "Ring Push-up",
+      "modality": "gymnastics",
+      "difficulty": "intermediate",
+      "equipment": ["rings"],
+      "patterns": ["horizontal-push", "stability", "core"],
+      "effects": ["strength", "stability", "skill"],
+      "variations": ["Feet-assisted ring push-up", "Strict ring push-up", "Tempo ring push-up", "Turned-out ring push-up", "Archer ring push-up"]
+    },
+    {
+      "name": "Strict Pull-up",
+      "modality": "gymnastics",
+      "difficulty": "intermediate",
+      "equipment": ["pull-up-bar"],
+      "patterns": ["vertical-pull", "upper-back", "grip"],
+      "effects": ["strength", "skill", "control"],
+      "variations": ["Band-assisted strict pull-up", "Eccentric pull-up", "Weighted strict pull-up", "Pause strict pull-up", "Mixed-grip pull-up"]
+    },
+    {
+      "name": "Kipping Pull-up",
+      "modality": "gymnastics",
+      "difficulty": "intermediate",
+      "equipment": ["pull-up-bar"],
+      "patterns": ["vertical-pull", "hip-drive", "coordination"],
+      "effects": ["engine", "skill", "stamina"],
+      "variations": ["Kip swing drill", "Small-set kipping pull-up", "Unbroken kipping pull-up", "Butterfly pull-up", "Weighted kip practice"]
+    },
+    {
+      "name": "Chest-to-Bar Pull-up",
+      "modality": "gymnastics",
+      "difficulty": "advanced",
+      "equipment": ["pull-up-bar"],
+      "patterns": ["vertical-pull", "hip-drive", "grip"],
+      "effects": ["skill", "power", "stamina"],
+      "variations": ["Band-assisted chest-to-bar", "Strict chest-to-bar", "Kipping chest-to-bar", "Butterfly chest-to-bar", "Touch-height ladder"]
+    },
+    {
+      "name": "Toes-to-Bar",
+      "modality": "gymnastics",
+      "difficulty": "advanced",
+      "equipment": ["pull-up-bar"],
+      "patterns": ["core", "hip-flexion", "grip"],
+      "effects": ["skill", "stamina", "coordination"],
+      "variations": ["Hanging knee raise", "Toe-to-target", "Strict toes-to-bar", "Kipping toes-to-bar", "L-swing to toes-to-bar"]
+    },
+    {
+      "name": "Knee Raise",
+      "modality": "gymnastics",
+      "difficulty": "beginner",
+      "equipment": ["pull-up-bar"],
+      "patterns": ["core", "hip-flexion", "grip"],
+      "effects": ["skill", "stamina", "control"],
+      "variations": ["Captain's chair knee raise", "Hanging knee raise", "Tempo knee raise", "Alternating knee raise", "Weighted knee raise"]
+    },
+    {
+      "name": "Sit-up",
+      "modality": "gymnastics",
+      "difficulty": "beginner",
+      "equipment": ["none"],
+      "patterns": ["core", "trunk-flexion"],
+      "effects": ["stamina", "volume", "recovery"],
+      "variations": ["Ab-mat sit-up", "Anchor sit-up", "Tempo sit-up", "Butterfly sit-up", "Weighted sit-up"]
+    },
+    {
+      "name": "GHD Sit-up",
+      "modality": "gymnastics",
+      "difficulty": "advanced",
+      "equipment": ["ghd"],
+      "patterns": ["core", "trunk-flexion", "hip-extension"],
+      "effects": ["strength", "stamina", "skill"],
+      "variations": ["Partial ROM GHD sit-up", "Strict GHD sit-up", "Weighted GHD sit-up", "Tempo GHD sit-up", "GHD hip-extension combo"]
+    },
+    {
+      "name": "Hollow Rock",
+      "modality": "gymnastics",
+      "difficulty": "beginner",
+      "equipment": ["none"],
+      "patterns": ["core", "midline-stability"],
+      "effects": ["skill", "stability", "recovery"],
+      "variations": ["Tuck hollow hold", "Hollow hold", "Hollow rock", "Weighted hollow hold", "Arch-hollow roll"]
+    },
+    {
+      "name": "V-up",
+      "modality": "gymnastics",
+      "difficulty": "intermediate",
+      "equipment": ["none"],
+      "patterns": ["core", "trunk-flexion", "hip-flexion"],
+      "effects": ["stamina", "skill", "volume"],
+      "variations": ["Single-leg V-up", "Alternating V-up", "Tempo V-up", "Weighted V-up", "Hollow-to-V-up"]
+    },
+    {
+      "name": "Dead Bug",
+      "modality": "gymnastics",
+      "difficulty": "beginner",
+      "equipment": ["none"],
+      "patterns": ["core", "midline-stability", "coordination"],
+      "effects": ["recovery", "stability", "skill"],
+      "variations": ["Bent-knee dead bug", "Straight-leg dead bug", "Banded dead bug", "Tempo dead bug", "Opposite-side dead bug"]
+    },
+    {
+      "name": "Plank",
+      "modality": "gymnastics",
+      "difficulty": "beginner",
+      "equipment": ["none"],
+      "patterns": ["core", "anti-extension", "stability"],
+      "effects": ["stability", "recovery", "skill"],
+      "variations": ["Forearm plank", "High plank", "RKC plank", "Side plank", "Plank shoulder tap"]
+    },
+    {
+      "name": "Rope Climb",
+      "modality": "gymnastics",
+      "difficulty": "advanced",
+      "equipment": ["rope"],
+      "patterns": ["vertical-pull", "grip", "hip-knee-coordination"],
+      "effects": ["skill", "strength", "mental"],
+      "variations": ["Seated rope pull", "J-hook rope climb", "S-hook rope climb", "Legless rope climb", "Controlled descent rope climb"]
+    },
+    {
+      "name": "Wall Walk",
+      "modality": "gymnastics",
+      "difficulty": "advanced",
+      "equipment": ["wall"],
+      "patterns": ["overhead", "core", "horizontal-push"],
+      "effects": ["skill", "strength", "mental"],
+      "variations": ["Partial wall walk", "Strict wall walk", "Shoulder tap wall hold", "Handstand facing wall hold", "Wall walk with pause"]
+    },
+    {
+      "name": "Handstand Push-up",
+      "modality": "gymnastics",
+      "difficulty": "advanced",
+      "equipment": ["wall"],
+      "patterns": ["vertical-push", "overhead", "core"],
+      "effects": ["strength", "skill", "control"],
+      "variations": ["Pike push-up", "Ab-mat handstand push-up", "Strict handstand push-up", "Kipping handstand push-up", "Deficit handstand push-up"]
+    },
+    {
+      "name": "Handstand Walk",
+      "modality": "gymnastics",
+      "difficulty": "advanced",
+      "equipment": ["none"],
+      "patterns": ["overhead", "balance", "core"],
+      "effects": ["skill", "coordination", "mental"],
+      "variations": ["Wall-supported handstand march", "Freestanding hold", "Short handstand walks", "Obstacle handstand walk", "Turn handstand walk"]
+    },
+    {
+      "name": "Ring Dip",
+      "modality": "gymnastics",
+      "difficulty": "advanced",
+      "equipment": ["rings"],
+      "patterns": ["vertical-push", "stability", "upper-body"],
+      "effects": ["strength", "skill", "control"],
+      "variations": ["Feet-assisted ring dip", "Band-assisted ring dip", "Strict ring dip", "Pause ring dip", "Weighted ring dip"]
+    },
+    {
+      "name": "Bar Muscle-up",
+      "modality": "gymnastics",
+      "difficulty": "advanced",
+      "equipment": ["pull-up-bar"],
+      "patterns": ["vertical-pull", "dip", "hip-drive"],
+      "effects": ["skill", "power", "coordination"],
+      "variations": ["Chest-to-bar transition drill", "Banded bar muscle-up", "Strict bar muscle-up", "Kipping bar muscle-up", "Turnover timing drill"]
+    },
+    {
+      "name": "Ring Muscle-up",
+      "modality": "gymnastics",
+      "difficulty": "advanced",
+      "equipment": ["rings"],
+      "patterns": ["vertical-pull", "dip", "stability"],
+      "effects": ["skill", "strength", "coordination"],
+      "variations": ["Low-ring transition drill", "Banded ring muscle-up", "Strict ring muscle-up", "Kipping ring muscle-up", "False-grip ring muscle-up"]
+    },
+    {
+      "name": "Deadlift",
+      "modality": "weightlifting",
+      "difficulty": "beginner",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["hinge", "posterior-chain", "grip"],
+      "effects": ["strength", "power", "skill"],
+      "variations": ["Tempo deadlift", "Pause deadlift", "Deficit deadlift", "Touch-and-go deadlift", "Heavy singles deadlift"]
+    },
+    {
+      "name": "Romanian Deadlift",
+      "modality": "weightlifting",
+      "difficulty": "intermediate",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["hinge", "hamstring", "posterior-chain"],
+      "effects": ["strength", "control", "hypertrophy"],
+      "variations": ["Dumbbell RDL", "Single-leg RDL", "Tempo RDL", "Snatch-grip RDL", "Deficit RDL"]
+    },
+    {
+      "name": "Sumo Deadlift High Pull",
+      "modality": "weightlifting",
+      "difficulty": "intermediate",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["hinge", "vertical-pull", "hip-drive"],
+      "effects": ["power", "engine", "coordination"],
+      "variations": ["Light SDHP", "Hang SDHP", "Wide-stance SDHP", "Tempo SDHP", "Cluster SDHP"]
+    },
+    {
+      "name": "Front Squat",
+      "modality": "weightlifting",
+      "difficulty": "intermediate",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["squat", "knee-dominant", "core"],
+      "effects": ["strength", "power", "position"],
+      "variations": ["Tempo front squat", "Pause front squat", "Cluster front squat", "Clean-grip front squat", "Cross-arm front squat"]
+    },
+    {
+      "name": "Back Squat",
+      "modality": "weightlifting",
+      "difficulty": "beginner",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["squat", "knee-dominant", "hip-drive"],
+      "effects": ["strength", "power", "volume"],
+      "variations": ["Tempo back squat", "Pause back squat", "Box back squat", "Safety-bar squat", "Wave loading back squat"]
+    },
+    {
+      "name": "Overhead Squat",
+      "modality": "weightlifting",
+      "difficulty": "advanced",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["squat", "overhead", "stability"],
+      "effects": ["skill", "strength", "mobility"],
+      "variations": ["PVC overhead squat", "Snatch-grip overhead squat", "Tempo overhead squat", "Pause overhead squat", "Heels-elevated overhead squat"]
+    },
+    {
+      "name": "Strict Press",
+      "modality": "weightlifting",
+      "difficulty": "beginner",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["vertical-push", "overhead", "core"],
+      "effects": ["strength", "control", "skill"],
+      "variations": ["Seated strict press", "Tempo strict press", "Pin strict press", "Behind-the-neck press", "Dumbbell strict press"]
+    },
+    {
+      "name": "Push Press",
+      "modality": "weightlifting",
+      "difficulty": "intermediate",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["vertical-push", "overhead", "hip-drive"],
+      "effects": ["power", "strength", "stamina"],
+      "variations": ["Tempo dip push press", "Behind-neck push press", "Split-stance push press", "Double dumbbell push press", "Cluster push press"]
+    },
+    {
+      "name": "Push Jerk",
+      "modality": "weightlifting",
+      "difficulty": "intermediate",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["vertical-push", "overhead", "power"],
+      "effects": ["power", "skill", "coordination"],
+      "variations": ["Dip-drive jerk drill", "Power jerk from rack", "Tempo catch jerk", "Split jerk to push jerk combo", "Double dip jerk drill"]
+    },
+    {
+      "name": "Split Jerk",
+      "modality": "weightlifting",
+      "difficulty": "advanced",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["vertical-push", "overhead", "split-stance"],
+      "effects": ["power", "skill", "coordination"],
+      "variations": ["Footwork split drill", "Jerk dip squat", "Jerk from blocks", "Tall split jerk", "Pause split jerk recover"]
+    },
+    {
+      "name": "Shoulder to Overhead",
+      "modality": "weightlifting",
+      "difficulty": "intermediate",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["vertical-push", "overhead"],
+      "effects": ["strength", "power", "engine"],
+      "variations": ["Strict press reps", "Push press reps", "Push jerk reps", "Split jerk reps", "Alternating barbell cycling"]
+    },
+    {
+      "name": "Power Clean",
+      "modality": "weightlifting",
+      "difficulty": "intermediate",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["hinge", "front-rack", "pull"],
+      "effects": ["power", "skill", "coordination"],
+      "variations": ["Hang power clean", "Block power clean", "Tempo pull + clean", "Touch-and-go power clean", "Pause above-knee power clean"]
+    },
+    {
+      "name": "Squat Clean",
+      "modality": "weightlifting",
+      "difficulty": "advanced",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["hinge", "squat", "front-rack"],
+      "effects": ["power", "strength", "skill"],
+      "variations": ["Hang squat clean", "Pause squat clean", "Block squat clean", "Clean pull + squat clean", "Cluster squat clean"]
+    },
+    {
+      "name": "Hang Power Clean",
+      "modality": "weightlifting",
+      "difficulty": "intermediate",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["hinge", "front-rack", "pull"],
+      "effects": ["power", "coordination", "speed"],
+      "variations": ["High-hang power clean", "Below-knee hang clean", "Pause hang clean", "No-foot hang clean", "Muscle clean"]
+    },
+    {
+      "name": "Clean and Jerk",
+      "modality": "weightlifting",
+      "difficulty": "advanced",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["hinge", "front-rack", "overhead"],
+      "effects": ["power", "strength", "skill"],
+      "variations": ["Power clean + push jerk", "Squat clean + split jerk", "Clean complex", "Jerk complex", "EMOM clean and jerk"]
+    },
+    {
+      "name": "Power Snatch",
+      "modality": "weightlifting",
+      "difficulty": "advanced",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["hinge", "overhead", "pull"],
+      "effects": ["power", "skill", "coordination"],
+      "variations": ["Hang power snatch", "Block power snatch", "Pause snatch pull + power snatch", "No-hook power snatch", "Touch-and-go power snatch"]
+    },
+    {
+      "name": "Squat Snatch",
+      "modality": "weightlifting",
+      "difficulty": "advanced",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["hinge", "overhead", "squat"],
+      "effects": ["power", "skill", "mobility"],
+      "variations": ["Hang squat snatch", "Pause squat snatch", "Snatch balance + squat snatch", "Block squat snatch", "Cluster squat snatch"]
+    },
+    {
+      "name": "Hang Snatch",
+      "modality": "weightlifting",
+      "difficulty": "advanced",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["hinge", "overhead", "pull"],
+      "effects": ["power", "skill", "speed"],
+      "variations": ["High-hang snatch", "Below-knee hang snatch", "No-foot hang snatch", "Hang power snatch", "Hang squat snatch"]
+    },
+    {
+      "name": "Thruster",
+      "modality": "weightlifting",
+      "difficulty": "intermediate",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["squat", "overhead", "full-body"],
+      "effects": ["engine", "power", "stamina"],
+      "variations": ["Light cycling thruster", "Heavy thruster", "Double dumbbell thruster", "Single-arm dumbbell thruster", "Pause thruster"]
+    },
+    {
+      "name": "Clean Pull",
+      "modality": "weightlifting",
+      "difficulty": "intermediate",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["hinge", "posterior-chain", "pull"],
+      "effects": ["power", "strength", "position"],
+      "variations": ["Segment clean pull", "Pause clean pull", "Deficit clean pull", "Snatch-grip clean pull", "Heavy clean pull"]
+    },
+    {
+      "name": "Snatch Pull",
+      "modality": "weightlifting",
+      "difficulty": "intermediate",
+      "equipment": ["barbell", "plates"],
+      "patterns": ["hinge", "posterior-chain", "pull"],
+      "effects": ["power", "strength", "position"],
+      "variations": ["Segment snatch pull", "Pause snatch pull", "Deficit snatch pull", "High-pull snatch pull", "Heavy snatch pull"]
+    },
+    {
+      "name": "Dumbbell Snatch",
+      "modality": "odd-object",
+      "difficulty": "beginner",
+      "equipment": ["dumbbell"],
+      "patterns": ["hinge", "overhead", "single-arm"],
+      "effects": ["power", "engine", "coordination"],
+      "variations": ["Alternating dumbbell snatch", "Hang dumbbell snatch", "Cycling dumbbell snatch", "Heavy single dumbbell snatch", "Power dumbbell snatch"]
+    },
+    {
+      "name": "Dumbbell Clean and Jerk",
+      "modality": "odd-object",
+      "difficulty": "intermediate",
+      "equipment": ["dumbbell"],
+      "patterns": ["hinge", "front-rack", "overhead"],
+      "effects": ["power", "skill", "engine"],
+      "variations": ["Alternating dumbbell clean and jerk", "Single-arm dumbbell clean and jerk", "Double dumbbell clean and jerk", "Hang dumbbell clean and jerk", "Split dumbbell jerk"]
+    },
+    {
+      "name": "Dumbbell Thruster",
+      "modality": "odd-object",
+      "difficulty": "beginner",
+      "equipment": ["dumbbell"],
+      "patterns": ["squat", "overhead", "full-body"],
+      "effects": ["engine", "stamina", "power"],
+      "variations": ["Single dumbbell thruster", "Double dumbbell thruster", "Alternating thruster", "Pause thruster", "Tempo thruster"]
+    },
+    {
+      "name": "Dumbbell Front Rack Lunge",
+      "modality": "odd-object",
+      "difficulty": "beginner",
+      "equipment": ["dumbbell"],
+      "patterns": ["single-leg", "front-rack", "knee-dominant"],
+      "effects": ["strength", "stamina", "balance"],
+      "variations": ["Walking front rack lunge", "Reverse front rack lunge", "Alternating step lunge", "Deficit lunge", "Double dumbbell lunge"]
+    },
+    {
+      "name": "Kettlebell Swing",
+      "modality": "odd-object",
+      "difficulty": "beginner",
+      "equipment": ["kettlebell"],
+      "patterns": ["hinge", "posterior-chain", "ballistic"],
+      "effects": ["power", "engine", "stamina"],
+      "variations": ["Russian kettlebell swing", "American kettlebell swing", "Single-arm kettlebell swing", "Tempo kettlebell swing", "Heavy kettlebell swing"]
+    },
+    {
+      "name": "Kettlebell Clean",
+      "modality": "odd-object",
+      "difficulty": "intermediate",
+      "equipment": ["kettlebell"],
+      "patterns": ["hinge", "front-rack", "single-arm"],
+      "effects": ["power", "skill", "coordination"],
+      "variations": ["Single kettlebell clean", "Double kettlebell clean", "Hang kettlebell clean", "Alternating kettlebell clean", "Kettlebell clean ladder"]
+    },
+    {
+      "name": "Kettlebell Snatch",
+      "modality": "odd-object",
+      "difficulty": "advanced",
+      "equipment": ["kettlebell"],
+      "patterns": ["hinge", "overhead", "single-arm"],
+      "effects": ["power", "skill", "engine"],
+      "variations": ["Single kettlebell snatch", "Alternating kettlebell snatch", "Hang kettlebell snatch", "Drop-and-catch kettlebell snatch", "Kettlebell snatch interval"]
+    },
+    {
+      "name": "Turkish Get-Up",
+      "modality": "odd-object",
+      "difficulty": "advanced",
+      "equipment": ["kettlebell"],
+      "patterns": ["overhead", "core", "shoulder-stability"],
+      "effects": ["stability", "skill", "control"],
+      "variations": ["Bodyweight get-up", "Half get-up", "Full kettlebell get-up", "Bottom-up get-up", "Tempo get-up"]
+    },
+    {
+      "name": "Wall Ball Shot",
+      "modality": "odd-object",
+      "difficulty": "beginner",
+      "equipment": ["wall-ball", "wall"],
+      "patterns": ["squat", "vertical-push", "coordination"],
+      "effects": ["engine", "stamina", "volume"],
+      "variations": ["Light wall ball", "Heavy wall ball", "Low target wall ball", "Lateral wall ball", "Partner wall ball"]
+    },
+    {
+      "name": "Med Ball Clean",
+      "modality": "odd-object",
+      "difficulty": "beginner",
+      "equipment": ["med-ball"],
+      "patterns": ["hinge", "front-load", "squat"],
+      "effects": ["power", "engine", "coordination"],
+      "variations": ["Ground to shoulder med-ball clean", "Cycling med-ball clean", "No-jump med-ball clean", "Partner med-ball clean", "Heavy med-ball clean"]
+    },
+    {
+      "name": "Sandbag Clean",
+      "modality": "odd-object",
+      "difficulty": "intermediate",
+      "equipment": ["sandbag"],
+      "patterns": ["hinge", "front-load", "full-body"],
+      "effects": ["strength", "power", "mental"],
+      "variations": ["Ground to shoulder sandbag clean", "Ground to lap to shoulder", "Cycling sandbag clean", "Heavy singles sandbag clean", "Sandbag clean to carry"]
+    },
+    {
+      "name": "Sandbag Front Carry",
+      "modality": "odd-object",
+      "difficulty": "beginner",
+      "equipment": ["sandbag"],
+      "patterns": ["carry", "core", "front-load"],
+      "effects": ["stamina", "strength", "mental"],
+      "variations": ["Short shuttle carry", "Long carry", "Uphill carry", "Bear-hug carry", "Carry with step-over"]
+    },
+    {
+      "name": "Farmer Carry",
+      "modality": "odd-object",
+      "difficulty": "beginner",
+      "equipment": ["dumbbell"],
+      "patterns": ["carry", "grip", "core"],
+      "effects": ["stamina", "strength", "stability"],
+      "variations": ["Double dumbbell carry", "Single-arm suitcase carry", "Heavy farmer hold", "Walking farmer carry", "Farmer carry intervals"]
+    },
+    {
+      "name": "Sled Push",
+      "modality": "odd-object",
+      "difficulty": "intermediate",
+      "equipment": ["sled"],
+      "patterns": ["knee-dominant", "drive", "full-body"],
+      "effects": ["power", "engine", "mental"],
+      "variations": ["Light fast sled push", "Heavy sled push", "Backward sled push", "Sprint sled push", "Sled push with turns"]
+    },
+    {
+      "name": "Sled Pull",
+      "modality": "odd-object",
+      "difficulty": "intermediate",
+      "equipment": ["sled"],
+      "patterns": ["pull", "posterior-chain", "grip"],
+      "effects": ["strength", "engine", "stamina"],
+      "variations": ["Forward sled drag", "Backward sled drag", "Hand-over-hand pull", "Heavy sled pull", "Sled pull intervals"]
+    },
+    {
+      "name": "Yoke Carry",
+      "modality": "odd-object",
+      "difficulty": "advanced",
+      "equipment": ["yoke"],
+      "patterns": ["carry", "core", "axial-load"],
+      "effects": ["strength", "stability", "mental"],
+      "variations": ["Light yoke walk", "Heavy yoke walk", "Yoke walk with turn", "Yoke shuttle", "Yoke carry intervals"]
+    },
+    {
+      "name": "Tire Flip",
+      "modality": "odd-object",
+      "difficulty": "advanced",
+      "equipment": ["tire"],
+      "patterns": ["hinge", "triple-extension", "full-body"],
+      "effects": ["power", "strength", "mental"],
+      "variations": ["Low-height tire flip", "Heavy tire single flips", "Tire flip sprint", "Partner tire flip", "Flip-and-jump-over"]
+    },
+    {
+      "name": "Devil Press",
+      "modality": "odd-object",
+      "difficulty": "advanced",
+      "equipment": ["dumbbell"],
+      "patterns": ["full-body", "hinge", "overhead"],
+      "effects": ["engine", "power", "mental"],
+      "variations": ["Alternating devil press", "Double dumbbell devil press", "No-pushup devil press", "Heavy devil press", "Tempo devil press"]
+    },
+    {
+      "name": "Man Maker",
+      "modality": "odd-object",
+      "difficulty": "advanced",
+      "equipment": ["dumbbell"],
+      "patterns": ["full-body", "push", "hinge", "squat"],
+      "effects": ["engine", "strength", "skill"],
+      "variations": ["Half man maker", "Alternating man maker", "Single dumbbell man maker", "Double dumbbell man maker", "Cluster man maker"]
+    },
+    {
+      "name": "Couch Stretch",
+      "modality": "recovery",
+      "difficulty": "beginner",
+      "equipment": ["box", "wall"],
+      "patterns": ["mobility", "hip-flexor", "quad"],
+      "effects": ["recovery", "mobility", "position"],
+      "variations": ["Bodyweight couch stretch", "Banded couch stretch", "Contract-relax couch stretch", "Elevated couch stretch", "Breathing couch stretch"]
+    },
+    {
+      "name": "Pigeon Stretch",
+      "modality": "recovery",
+      "difficulty": "beginner",
+      "equipment": ["none"],
+      "patterns": ["mobility", "hip", "glute"],
+      "effects": ["recovery", "mobility", "relaxation"],
+      "variations": ["Supported pigeon", "Forward fold pigeon", "Upright pigeon", "Thread-the-needle option", "Breath-count pigeon"]
+    },
+    {
+      "name": "Thoracic Rotation",
+      "modality": "recovery",
+      "difficulty": "beginner",
+      "equipment": ["none"],
+      "patterns": ["mobility", "t-spine", "rotation"],
+      "effects": ["recovery", "mobility", "position"],
+      "variations": ["Quadruped thoracic rotation", "Side-lying windmill", "Open-book drill", "Foam roller T-spine extension", "Banded thoracic opener"]
+    },
+    {
+      "name": "Child Pose Breathing",
+      "modality": "recovery",
+      "difficulty": "beginner",
+      "equipment": ["none"],
+      "patterns": ["mobility", "breathing", "recovery"],
+      "effects": ["recovery", "downregulation", "relaxation"],
+      "variations": ["Arms-forward child pose", "Side reach child pose", "Nasal breathing child pose", "Box-assisted child pose", "Diaphragm-focused child pose"]
+    }
+  ]
+}
