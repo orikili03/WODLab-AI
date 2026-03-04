@@ -1,15 +1,22 @@
-/**
- * Legacy auth token utilities.
- *
- * JWT is now stored in an HttpOnly cookie (set by the backend).
- * These functions exist only for migration cleanup — removing any
- * old tokens from localStorage on first load after the upgrade.
- */
+export const AUTH_STORAGE_KEY = "wodlab_token";
 
-export const AUTH_STORAGE_KEY = "wodlab_auth_token";
+export function getStoredToken(): string | null {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(AUTH_STORAGE_KEY);
+}
 
-/** Remove any legacy token from localStorage (migration cleanup). */
-export function clearLegacyToken(): void {
+export function setStoredToken(token: string): void {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(AUTH_STORAGE_KEY, token);
+}
+
+export function clearStoredToken(): void {
     if (typeof window === "undefined") return;
     localStorage.removeItem(AUTH_STORAGE_KEY);
+}
+
+/** Legacy cleanup: clear older key if it exists */
+export function clearLegacyToken(): void {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem("wodlab_auth_token");
 }

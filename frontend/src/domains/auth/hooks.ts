@@ -9,11 +9,11 @@ import type { AuthUser } from './AuthTokenContext';
  */
 type AuthResponse = {
     user: AuthUser;
+    token?: string; // Token returned for header-based auth fallback
 };
 
 /**
  * Hook for logging in.
- * The JWT is set as an HttpOnly cookie by the backend — never touches JS.
  */
 export function useLogin(): UseMutationResult<AuthResponse, Error, { email: string; password: string }, unknown> {
     const { onLoginSuccess } = useAuth();
@@ -24,14 +24,13 @@ export function useLogin(): UseMutationResult<AuthResponse, Error, { email: stri
             return response.data;
         },
         onSuccess: (data) => {
-            onLoginSuccess(data.user);
+            onLoginSuccess(data.user, data.token);
         },
     });
 }
 
 /**
  * Hook for registering a new user.
- * The JWT is set as an HttpOnly cookie by the backend — never touches JS.
  */
 export function useRegister(): UseMutationResult<AuthResponse, Error, { email: string; password: string }, unknown> {
     const { onLoginSuccess } = useAuth();
@@ -42,7 +41,7 @@ export function useRegister(): UseMutationResult<AuthResponse, Error, { email: s
             return response.data;
         },
         onSuccess: (data) => {
-            onLoginSuccess(data.user);
+            onLoginSuccess(data.user, data.token);
         },
     });
 }

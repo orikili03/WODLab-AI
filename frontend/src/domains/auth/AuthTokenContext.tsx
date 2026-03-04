@@ -1,21 +1,21 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { useState, useEffect, useCallback } from "react";
 import { apiClient } from "../../lib/apiClient";
-import { clearLegacyToken } from "../../lib/authToken";
+import { clearLegacyToken, setStoredToken, clearStoredToken } from "../../lib/authToken";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 export type AuthUser = { id: string; email: string };
 
 type AuthContextValue = {
-    /** Whether the user is authenticated (cookie verified). */
+    /** Whether the user is authenticated. */
     isAuthenticated: boolean;
     /** True while the initial session check is in progress. */
     isLoading: boolean;
     /** Basic user info from the session. */
     user: AuthUser | null;
-    /** Call after a successful login/register to update UI state. */
-    onLoginSuccess: (user: AuthUser) => void;
-    /** Clear session (calls backend logout to remove cookie). */
+    /** Call after a successful login/register to update UI state and store token. */
+    onLoginSuccess: (user: AuthUser, token?: string) => void;
+    /** Clear session (calls backend logout + wipes storage). */
     logout: () => Promise<void>;
 };
 
@@ -27,7 +27,7 @@ export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState<AuthUser | null>(null);
 
-    // On mount: clean up legacy localStorage token + verify cookie session
+    // On mount: clean up legacy token + verify session (server-side cookie or header fallback)
     useEffect(() => {
         clearLegacyToken();
 
@@ -40,11 +40,13 @@ export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
             .catch(() => {
                 setUser(null);
                 setIsAuthenticated(false);
+                clearStoredToken(); // Wipe maybe-stale token if check fails
             })
             .finally(() => setIsLoading(false));
     }, []);
 
-    const onLoginSuccess = useCallback((userData: AuthUser) => {
+    const onLoginSuccess = useCallback((userData: AuthUser, token?: string) => {
+        if (token) setStoredToken(token);
         setUser(userData);
         setIsAuthenticated(true);
     }, []);
@@ -53,10 +55,11 @@ export function AuthTokenProvider({ children }: { children: React.ReactNode }) {
         try {
             await apiClient.post("/auth/logout");
         } catch {
-            // Ignore network errors on logout — cookie may already be gone
+            // Ignore network errors
         }
         setUser(null);
         setIsAuthenticated(false);
+        clearStoredToken();
     }, []);
 
     const value: AuthContextValue = {
