@@ -39,7 +39,7 @@ Structured performance tracking (numeric scoring, RPE, and completion rates) tha
 - **Backend:** Node.js, Express, TypeScript.
 - **Database:** MongoDB Atlas (Mongoose).
 - **AI/RAG:** Vertex AI (Gemini 2.0) + Atlas Vector Search.
-- **Authentication:** Dual-Auth Strategy (HttpOnly Cookies + JWT Bearer Header) for cross-domain mobile stability.
+- **Authentication:** HttpOnly cookie (`SameSite=Lax`, `Secure` in production). Single-service deployment — no cross-domain issues.
 
 ## 📁 Project Structure
 - `/WODLab-V2/frontend`: React application.
