@@ -64,7 +64,7 @@ export function setAuthCookie(res: Response, token: string): void {
     res.cookie(AUTH_COOKIE_NAME, token, {
         httpOnly: true,
         secure: true,
-        sameSite: "lax", // Better for mobile/Safari ITP
+        sameSite: "none",
         maxAge: 7 * 24 * 60 * 60 * 1000,
         path: "/",
     });
@@ -77,7 +77,7 @@ export function clearAuthCookie(res: Response): void {
     res.clearCookie(AUTH_COOKIE_NAME, {
         httpOnly: true,
         secure: true,
-        sameSite: "lax",
+        sameSite: "none",
         path: "/",
     });
 }
