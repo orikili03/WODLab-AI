@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response, type RequestHandler } from "express";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { rateLimit } from "express-rate-limit";
@@ -7,6 +7,10 @@ import { signToken, setAuthCookie, clearAuthCookie, authGuard } from "../middlew
 import { env } from "../config/env.js";
 
 const router = Router();
+
+interface AuthenticatedRequest extends Request {
+    userId?: string;
+}
 
 // ─── Rate Limiters ────────────────────────────────────────────────────────
 const authLimiter = rateLimit({
@@ -34,7 +38,7 @@ const loginSchema = z.object({
 });
 
 // ─── POST /auth/register ──────────────────────────────────────────────────
-router.post("/register", async (req, res) => {
+router.post("/register", (async (req: Request, res: Response) => {
     try {
         const { email, password } = registerSchema.parse(req.body);
 
@@ -64,10 +68,10 @@ router.post("/register", async (req, res) => {
         }
         throw err;
     }
-});
+}) as unknown as RequestHandler);
 
 // ─── POST /auth/login ─────────────────────────────────────────────────────
-router.post("/login", async (req, res) => {
+router.post("/login", (async (req: Request, res: Response) => {
     try {
         const { email, password } = loginSchema.parse(req.body);
 
@@ -95,16 +99,16 @@ router.post("/login", async (req, res) => {
         }
         throw err;
     }
-});
+}) as unknown as RequestHandler);
 
 // ─── POST /auth/logout ───────────────────────────────────────────────────
-router.post("/logout", (_req, res) => {
+router.post("/logout", ((_req: Request, res: Response) => {
     clearAuthCookie(res);
     res.json({ success: true });
-});
+}) as unknown as RequestHandler);
 
 // ─── GET /auth/me — Lightweight session check ────────────────────────────
-router.get("/me", authGuard, async (req, res) => {
+router.get("/me", authGuard as unknown as RequestHandler, (async (req: AuthenticatedRequest, res: Response) => {
     const user = await User.findById(req.userId).select("email");
     if (!user) {
         clearAuthCookie(res);
@@ -112,7 +116,7 @@ router.get("/me", authGuard, async (req, res) => {
         return;
     }
     res.json({ user: { id: user.id, email: user.email } });
-});
+}) as unknown as RequestHandler);
 
 export default router;
 

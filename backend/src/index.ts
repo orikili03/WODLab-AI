@@ -1,4 +1,4 @@
-import express, { Router } from "express";
+import express, { Router, type Request, type Response } from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
@@ -32,7 +32,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 // ─── Health Check (root-level for load balancer compatibility) ────────────
-app.get("/health", (_req, res) => {
+app.get("/health", (_req: Request, res: Response) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
@@ -63,7 +63,7 @@ if (hasFrontend) {
 }
 
 // Catch-all: serve index.html for any GET that isn't an API or health route
-app.get("*path", (req, res, next) => {
+app.get("*path", (req: Request, res: Response, next) => {
     if (req.path.startsWith("/api") || req.path.startsWith("/health")) {
         return next();
     }

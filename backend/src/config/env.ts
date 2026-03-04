@@ -10,12 +10,17 @@ const envSchema = z.object({
     CORS_ORIGIN: z.string().default("http://localhost:5173"),
 });
 
-const parsed = envSchema.safeParse(process.env);
-
-if (!parsed.success) {
-    console.error("❌ Invalid environment variables:");
-    console.error(parsed.error.format());
+let envData;
+try {
+    envData = envSchema.parse(process.env);
+} catch (error) {
+    if (error instanceof z.ZodError) {
+        console.error("❌ Invalid environment variables:");
+        console.error(error.format());
+    } else {
+        console.error("❌ Environment parsing error:", error);
+    }
     process.exit(1);
 }
 
-export const env = parsed.data;
+export const env = envData;

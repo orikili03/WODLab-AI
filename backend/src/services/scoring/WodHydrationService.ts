@@ -93,7 +93,7 @@ export class WodHydrationService {
 
         const nowMs = now.getTime();
 
-        const history: HistoricalSession[] = rawWorkouts.map((w) => {
+        const history: HistoricalSession[] = rawWorkouts.map((w: any) => {
             const movementNames: string[] = w.wod?.movements ?? [];
 
             const modalities = new Set<Modality>();

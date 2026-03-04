@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response, type RequestHandler } from "express";
 import { z } from "zod";
 import { Workout } from "../models/Workout.js";
 import { User } from "../models/User.js";
@@ -11,8 +11,12 @@ import type { FitnessLevel } from "../models/User.js";
 
 const router = Router();
 
+interface AuthenticatedRequest extends Request {
+    userId?: string;
+}
+
 // All workout routes require authentication
-router.use(authGuard);
+router.use(authGuard as unknown as RequestHandler);
 
 // ─── Generate Request Validation ──────────────────────────────────────────
 const generateSchema = z.object({
@@ -25,7 +29,7 @@ const generateSchema = z.object({
 
 // ─── POST /workouts/generate ──────────────────────────────────────────────
 // Full pipeline: filter → variance → assemble → save → return
-router.post("/generate", async (req, res) => {
+router.post("/generate", (async (req: AuthenticatedRequest, res: Response) => {
     try {
         const payload = generateSchema.parse(req.body);
 
@@ -99,14 +103,14 @@ router.post("/generate", async (req, res) => {
         }
         throw err;
     }
-});
+}) as unknown as RequestHandler);
 
 // ─── GET /workouts/history ────────────────────────────────────────────────
 // Cursor-based pagination: ?limit=20&cursor=<lastId>
 // Returns { data, nextCursor, hasMore, total }
 const DEFAULT_PAGE_SIZE = 20;
 
-router.get("/history", async (req, res) => {
+router.get("/history", (async (req: AuthenticatedRequest, res: Response) => {
     const limit = Math.min(
         Math.max(Number(req.query.limit) || DEFAULT_PAGE_SIZE, 1),
         100 // hard cap
@@ -142,7 +146,7 @@ router.get("/history", async (req, res) => {
     const nextCursor = hasMore ? page[page.length - 1]._id.toString() : null;
 
     res.json({ data, nextCursor, hasMore, total });
-});
+}) as unknown as RequestHandler);
 
 // ─── POST /workouts/complete ──────────────────────────────────────────────
 const completeSchema = z.object({
@@ -151,7 +155,7 @@ const completeSchema = z.object({
     roundsOrReps: z.number().optional(),
 });
 
-router.post("/complete", async (req, res) => {
+router.post("/complete", (async (req: AuthenticatedRequest, res: Response) => {
     try {
         const { workoutId, completionTime, roundsOrReps } = completeSchema.parse(req.body);
 
@@ -180,7 +184,7 @@ router.post("/complete", async (req, res) => {
         }
         throw err;
     }
-});
+}) as unknown as RequestHandler);
 
 // ─── DELETE /workouts/history ─────────────────────────────────────────────
 // Requires { confirm: "DELETE_ALL_HISTORY" } in body to prevent accidental wipes.
@@ -188,7 +192,7 @@ const deleteHistorySchema = z.object({
     confirm: z.literal("DELETE_ALL_HISTORY"),
 });
 
-router.delete("/history", async (req, res) => {
+router.delete("/history", (async (req: AuthenticatedRequest, res: Response) => {
     try {
         deleteHistorySchema.parse(req.body);
     } catch (err) {
@@ -201,11 +205,11 @@ router.delete("/history", async (req, res) => {
 
     const result = await Workout.deleteMany({ userId: req.userId });
     res.json({ data: { success: true, deletedCount: result.deletedCount } });
-});
+}) as unknown as RequestHandler);
 
 // ─── DELETE /workouts/:id ─────────────────────────────────────────────────
 // Delete a single workout by ID (ownership verified).
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", (async (req: AuthenticatedRequest, res: Response) => {
     const result = await Workout.findOneAndDelete({
         _id: req.params.id,
         userId: req.userId,
@@ -217,6 +221,6 @@ router.delete("/:id", async (req, res) => {
     }
 
     res.json({ data: { success: true } });
-});
+}) as unknown as RequestHandler);
 
 export default router;

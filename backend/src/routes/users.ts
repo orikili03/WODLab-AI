@@ -1,12 +1,16 @@
-import { Router } from "express";
+import { Router, type Request, type Response, type RequestHandler } from "express";
 import { z } from "zod";
 import { User, FITNESS_LEVELS } from "../models/User.js";
 import { authGuard } from "../middleware/auth.js";
 
 const router = Router();
 
+interface AuthenticatedRequest extends Request {
+    userId?: string;
+}
+
 // All user routes require authentication
-router.use(authGuard);
+router.use(authGuard as unknown as RequestHandler);
 
 // ─── Validation Schemas ───────────────────────────────────────────────────
 const updateProfileSchema = z.object({
@@ -32,7 +36,7 @@ const equipmentStateSchema = z.object({
 });
 
 // ─── GET /users/me ────────────────────────────────────────────────────────
-router.get("/me", async (req, res) => {
+router.get("/me", (async (req: AuthenticatedRequest, res: Response) => {
     const user = await User.findById(req.userId).select("-passwordHash");
     if (!user) {
         res.status(404).json({ error: "User not found" });
@@ -48,10 +52,10 @@ router.get("/me", async (req, res) => {
             goals: user.goals,
         },
     });
-});
+}) as unknown as RequestHandler);
 
 // ─── PUT /users/me ────────────────────────────────────────────────────────
-router.put("/me", async (req, res) => {
+router.put("/me", (async (req: AuthenticatedRequest, res: Response) => {
     try {
         const updates = updateProfileSchema.parse(req.body);
 
@@ -82,10 +86,10 @@ router.put("/me", async (req, res) => {
         }
         throw err;
     }
-});
+}) as unknown as RequestHandler);
 
 // ─── PUT /users/me/equipment ──────────────────────────────────────────────
-router.put("/me/equipment", async (req, res) => {
+router.put("/me/equipment", (async (req: AuthenticatedRequest, res: Response) => {
     try {
         const equipmentState = equipmentStateSchema.parse(req.body);
 
@@ -112,6 +116,6 @@ router.put("/me/equipment", async (req, res) => {
         }
         throw err;
     }
-});
+}) as unknown as RequestHandler);
 
 export default router;
