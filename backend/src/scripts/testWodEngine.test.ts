@@ -8,7 +8,6 @@ import type { HydratedContext, HistoricalSession as RecentSession } from "../ser
 import type { Modality } from "../models/Movement.js";
 
 const DAYS_TO_SIMULATE = 30;
-const USER_PREFERENCE_DUR = 15; // default for mock athlete
 
 const MOCK_ATHLETE = {
     userId: new mongoose.Types.ObjectId().toString(),
@@ -37,7 +36,6 @@ describe("WOD Engine Monte Carlo Simulation", () => {
             isColdStart: true,
             fitnessLevel: MOCK_ATHLETE.fitnessLevel,
             goals: MOCK_ATHLETE.goals,
-            workoutDuration: USER_PREFERENCE_DUR,
             history: []
         };
 

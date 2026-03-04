@@ -86,7 +86,6 @@ async function seedHistory() {
                 email: athlete.email,
                 passwordHash,
                 fitnessLevel: athlete.level,
-                workoutDuration: 15,
                 equipment: {
                     selected: EQUIPMENT_IDS.map((id) => ({ id })),
                     customPresets: [],

@@ -25,7 +25,6 @@ export interface HistoricalSession {
 export interface HydratedContext {
     fitnessLevel: FitnessLevel;
     goals: string[];
-    workoutDuration: number;
     /** Up to 5 recent sessions, newest first (matches DB sort: _id: -1) */
     history: HistoricalSession[];
     /** True when the athlete has no recorded history (cold start) */
@@ -58,7 +57,7 @@ export class WodHydrationService {
 
         // ── Single round-trip: user profile + raw workout history ──────
         const [user, rawWorkouts] = await Promise.all([
-            User.findById(userId).select("fitnessLevel goals workoutDuration").lean(),
+            User.findById(userId).select("fitnessLevel goals").lean(),
             Workout.find({ userId, dateString: { $exists: true } })
                 .sort({ _id: -1 })
                 .limit(5)
@@ -78,7 +77,6 @@ export class WodHydrationService {
             return {
                 fitnessLevel: user.fitnessLevel as FitnessLevel,
                 goals: user.goals ?? [],
-                workoutDuration: user.workoutDuration ?? 15,
                 history: [],
                 isColdStart: true,
             };
@@ -139,7 +137,6 @@ export class WodHydrationService {
         return {
             fitnessLevel: user.fitnessLevel as FitnessLevel,
             goals: user.goals ?? [],
-            workoutDuration: user.workoutDuration ?? 15,
             history,
             isColdStart: false,
         };

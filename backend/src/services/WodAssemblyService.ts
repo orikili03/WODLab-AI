@@ -259,7 +259,7 @@ export class WodAssemblyService {
 
         // ── 2. Select protocol + duration (deterministic seeded pick) ─────
         const { protocol, duration, ladderType, scoringType } =
-            this.selectProtocolAndDuration(category, userId, context.workoutDuration, salt, dateOverride);
+            this.selectProtocolAndDuration(category, userId, salt, dateOverride);
 
         const config = TEMPLATES[protocol];
 
@@ -367,7 +367,6 @@ export class WodAssemblyService {
     private selectProtocolAndDuration(
         category: WodCategory,
         userId: string,
-        preferredDuration: number,
         salt: string = "",
         dateOverride?: Date
     ): {
@@ -405,12 +404,8 @@ export class WodAssemblyService {
             ];
             const p = this.weightedPick(options, rng);
 
-            // Bias durations toward user's workoutDuration preference
             const durations = [8, 10, 12, 15, 18, 20];
-            const preferred = preferredDuration || 15;
-            const duration = durations.reduce((prev, curr) =>
-                Math.abs(curr - preferred) < Math.abs(prev - preferred) ? curr : prev
-            );
+            const duration = durations[Math.floor(rng.next() * durations.length)];
             return {
                 protocol: p,
                 duration,
