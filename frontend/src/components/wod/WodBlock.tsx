@@ -40,11 +40,11 @@ function formatQuantity(qty: { value: number; unit: string }): string {
 }
 
 /**
- * Formats a load object into a human-readable string.
- * Example: { value: 60, unit: "kg" } → "60 kg"
+ * Formats a load value (canonical kg) into a human-readable string.
+ * Example: 60 → "60 kg"
  */
-function formatLoad(load: { value: number; unit: string }): string {
-    return `${load.value} ${load.unit}`;
+function formatLoad(load: number): string {
+    return `${load} kg`;
 }
 
 export interface WodBlockProps {

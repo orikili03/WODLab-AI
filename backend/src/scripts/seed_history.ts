@@ -2,7 +2,7 @@ import "dotenv/config";
 import mongoose from "mongoose";
 import { User, type FitnessLevel } from "../models/User.js";
 import { Workout } from "../models/Workout.js";
-import { wodAssemblyService, type WodCategory } from "../services/WodAssemblyService.js";
+import { wodAssemblyService, type WodCategory, type WodProtocol } from "../services/WodAssemblyService.js";
 import { wodHydrationService } from "../services/scoring/WodHydrationService.js";
 import { movementFilterService } from "../services/MovementFilterService.js";
 import { varianceCheckerService } from "../services/VarianceCheckerService.js";
@@ -31,6 +31,180 @@ function buildWodMeta(userId: string, date: Date) {
         dateString: `${dd}/${mm}/${yyyy}`,
         timeString: `${hh}:${min}`,
     };
+}
+
+// ─── Deterministic RNG (LCG — no external dep) ────────────────────────────
+function makeRng(seed: number): () => number {
+    let s = seed >>> 0;
+    return () => {
+        s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+        return s / 4294967295;
+    };
+}
+
+// ─── Completion Stats Types ───────────────────────────────────────────────
+interface SessionStats {
+    totalSeconds?: number;
+    rx: boolean;
+}
+
+interface CompletionStats {
+    session: SessionStats;
+    rpe: number;
+    // Internal data used by buildPerformedForItem — not written to DB directly
+    _rounds?: number;             // AMRAP / EMOM / DEATH_BY / LADDER rounds
+    _tabataRepsPerInterval?: number;
+    _strengthKg?: number;         // STRENGTH_SINGLE / STRENGTH_SETS kg lifted
+    _forTimeRounds?: number;      // FOR_TIME / CHIPPER rounds
+}
+
+// ─── Session Stats Generator ──────────────────────────────────────────────
+function generateCompletionStats(
+    protocol: WodProtocol,
+    category: WodCategory,
+    durationMinutes: number,
+    fitnessLevel: FitnessLevel,
+    daySeed: number,
+    wodRounds?: number,
+): CompletionStats {
+    const rng = makeRng(daySeed);
+    const isRx = fitnessLevel === "rx";
+    const rx = true; // all seeded workouts marked as completed at prescribed weight
+
+    // RPE: 1–5 scale
+    const rpeBase: Record<WodCategory, [number, number]> = {
+        sprint: [4, 5],
+        metcon: isRx ? [3, 5] : [3, 4],
+        long: [3, 4],
+    };
+    const [rpeMin, rpeMax] = rpeBase[category];
+    const rpe = Math.round(rpeMin + rng() * (rpeMax - rpeMin));
+
+    const dur = durationMinutes || 10;
+
+    switch (protocol) {
+        case "AMRAP": {
+            const roundsPerMin = isRx ? 0.48 + rng() * 0.14 : 0.33 + rng() * 0.10;
+            const rounds = Math.max(1, Math.round(dur * roundsPerMin));
+            // AMRAP runs for the full prescribed duration
+            return { session: { totalSeconds: dur * 60, rx }, rpe, _rounds: rounds };
+        }
+        case "FOR_TIME":
+        case "CHIPPER": {
+            const pct = isRx ? 0.62 + rng() * 0.16 : 0.78 + rng() * 0.15;
+            const totalSec = Math.round(dur * pct * 60);
+            return { session: { totalSeconds: totalSec, rx }, rpe, _forTimeRounds: wodRounds ?? 1 };
+        }
+        case "21_15_9": {
+            const pct = isRx ? 0.62 + rng() * 0.16 : 0.78 + rng() * 0.15;
+            const totalSec = Math.round(dur * pct * 60);
+            return { session: { totalSeconds: totalSec, rx }, rpe };
+        }
+        case "EMOM": {
+            // EMOM runs for exactly dur minutes
+            return { session: { totalSeconds: dur * 60, rx }, rpe, _rounds: dur };
+        }
+        case "TABATA": {
+            const repsPerInterval = isRx ? Math.round(11 + rng() * 6) : Math.round(7 + rng() * 5);
+            // Standard TABATA: 8 intervals × 30 s = 4 min
+            return { session: { totalSeconds: 8 * 30, rx }, rpe, _tabataRepsPerInterval: repsPerInterval };
+        }
+        case "DEATH_BY": {
+            const round = isRx ? Math.round(13 + rng() * 5) : Math.round(8 + rng() * 6);
+            // Each DEATH_BY round = 1 minute; athlete works until failure
+            return { session: { totalSeconds: round * 60, rx }, rpe, _rounds: round };
+        }
+        case "LADDER": {
+            const round = isRx ? Math.round(9 + rng() * 5) : Math.round(5 + rng() * 5);
+            // Same cadence as DEATH_BY — 1 round per minute
+            return { session: { totalSeconds: round * 60, rx }, rpe, _rounds: round };
+        }
+        case "STRENGTH_SINGLE": {
+            const kg = isRx ? Math.round(85 + rng() * 35) : Math.round(40 + rng() * 30);
+            return { session: { rx }, rpe, _strengthKg: kg };
+        }
+        case "STRENGTH_SETS": {
+            const kg = isRx ? Math.round(65 + rng() * 35) : Math.round(30 + rng() * 30);
+            return { session: { rx }, rpe, _strengthKg: kg };
+        }
+        case "INTERVAL": {
+            const avgSec = isRx ? Math.round(52 + rng() * 20) : Math.round(68 + rng() * 25);
+            const intervalCount = Math.max(1, Math.round(dur / (avgSec / 60)));
+            return { session: { totalSeconds: avgSec * intervalCount, rx }, rpe, _rounds: intervalCount };
+        }
+        default:
+            return { session: { rx }, rpe };
+    }
+}
+
+// ─── Per-Movement Performed Builder ───────────────────────────────────────
+interface PerformedData {
+    volume?: { repsPerRound: number[]; totalReps: number };
+    load?: number;
+}
+
+function buildPerformedForItem(
+    protocol: WodProtocol,
+    stats: CompletionStats,
+    item: { quantity: { value: number; unit: string }; load?: number },
+): PerformedData | undefined {
+    const prescribedReps = item.quantity.unit === "reps" ? item.quantity.value : undefined;
+    const prescribedLoad = item.load;
+
+    const withLoad = (data: Omit<PerformedData, "load">): PerformedData =>
+        prescribedLoad !== undefined ? { ...data, load: prescribedLoad } : data;
+
+    switch (protocol) {
+        case "AMRAP": {
+            if (!prescribedReps || !stats._rounds) return prescribedLoad !== undefined ? { load: prescribedLoad } : undefined;
+            const arr = Array<number>(stats._rounds).fill(prescribedReps);
+            return withLoad({ volume: { repsPerRound: arr, totalReps: stats._rounds * prescribedReps } });
+        }
+        case "FOR_TIME":
+        case "CHIPPER": {
+            const rounds = stats._forTimeRounds ?? 1;
+            if (!prescribedReps) return prescribedLoad !== undefined ? { load: prescribedLoad } : undefined;
+            const arr = Array<number>(rounds).fill(prescribedReps);
+            return withLoad({ volume: { repsPerRound: arr, totalReps: rounds * prescribedReps } });
+        }
+        case "21_15_9": {
+            if (!prescribedReps) return prescribedLoad !== undefined ? { load: prescribedLoad } : undefined;
+            return withLoad({ volume: { repsPerRound: [21, 15, 9], totalReps: 45 } });
+        }
+        case "EMOM": {
+            if (!prescribedReps || !stats._rounds) return undefined;
+            const arr = Array<number>(stats._rounds).fill(prescribedReps);
+            return { volume: { repsPerRound: arr, totalReps: stats._rounds * prescribedReps } };
+        }
+        case "TABATA": {
+            const rpi = stats._tabataRepsPerInterval ?? 10;
+            const arr = Array<number>(8).fill(rpi);
+            return { volume: { repsPerRound: arr, totalReps: rpi * 8 } };
+        }
+        case "DEATH_BY":
+        case "LADDER": {
+            const maxRound = stats._rounds ?? 0;
+            if (maxRound <= 0) return undefined;
+            const arr = Array.from({ length: maxRound }, (_, i) => i + 1);
+            const totalReps = (maxRound * (maxRound + 1)) / 2;
+            return { volume: { repsPerRound: arr, totalReps } };
+        }
+        case "STRENGTH_SINGLE": {
+            return stats._strengthKg !== undefined ? { load: stats._strengthKg } : undefined;
+        }
+        case "STRENGTH_SETS": {
+            const arr = Array<number>(5).fill(5);
+            const base: PerformedData = { volume: { repsPerRound: arr, totalReps: 25 } };
+            return stats._strengthKg !== undefined ? { ...base, load: stats._strengthKg } : base;
+        }
+        case "INTERVAL": {
+            if (!prescribedReps || !stats._rounds) return undefined;
+            const arr = Array<number>(stats._rounds).fill(prescribedReps);
+            return { volume: { repsPerRound: arr, totalReps: stats._rounds * prescribedReps } };
+        }
+        default:
+            return undefined;
+    }
 }
 
 async function seedHistory() {
@@ -143,6 +317,21 @@ async function seedHistory() {
                 date
             );
 
+            const stats = generateCompletionStats(
+                generated.wod.protocol,
+                category,
+                generated.wod.duration || 0,
+                athlete.level,
+                date.getTime(),
+                generated.wod.rounds,
+            );
+
+            // Enrich movementItems with performed data
+            const enrichedMovementItems = generated.wod.movementItems.map((item) => ({
+                ...item,
+                performed: buildPerformedForItem(generated.wod.protocol, stats, item),
+            }));
+
             await Workout.create({
                 wodId: meta.wodId,
                 userId: athlete.id,
@@ -152,7 +341,11 @@ async function seedHistory() {
                 durationPreference: category,
                 durationMinutes: generated.wod.duration || 0,
                 completedAt: date,
-                ...generated,
+                wod: { ...generated.wod, movementItems: enrichedMovementItems },
+                equipmentPresetName: generated.equipmentPresetName,
+                equipmentUsed: generated.equipmentUsed,
+                session: stats.session,
+                rpe: stats.rpe,
             });
         }
         console.log(`✅ ${athlete.name} Complete.`);

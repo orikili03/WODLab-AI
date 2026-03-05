@@ -1,265 +1,289 @@
 import type { FilteredMovement } from "../MovementFilterService.js";
 import type { HydratedContext } from "./WodHydrationService.js";
-import { methodistMatrix } from "./MethodistMatrix.js";
 import { dailySeed, SeededRng } from "../../utils/seed.js";
+
+// ─── Scored Movement ──────────────────────────────────────────────────────
+
+export interface ScoredMovement {
+    movement: FilteredMovement;
+    score: number;
+}
 
 // ─── Scoring Constants ────────────────────────────────────────────────────
 
-/** Exact movement reused within the given hour window → penalty */
-const DECAY_24H = -10.0; // Absolute ban for 24 hours (drops below floor)
-const DECAY_48H = -2.0;
-const DECAY_72H = -1.0;
+const FATIGUE_DECAY_24H   = -10.0;
+const FATIGUE_DECAY_48H   = -2.0;
+const FATIGUE_DECAY_72H   = -1.0;
+const PATTERN_PENALTY_PER = 1.3;
+const PATTERN_PENALTY_CAP = 4.0;
+const METHODIST_OVER_BIAS = -2.0; // over-represented modality (>60% share)
+const METHODIST_UNDER_BIAS = 2.0; // least-represented modality
+const METHODIST_OVER_THRESHOLD = 0.6;
+const GOAL_BONUS_PER_MATCH = 1.0;
+const GOAL_BONUS_MAX       = 3.0;
+const SKILL_BONUS_EXACT    = 1.0;
+const SKILL_BONUS_ADJACENT = 0.5;
+// Top-N pool size for seeded pick
+const PICK_POOL_SIZE = 8;
 
-/** Per pattern-instance penalty, summed across history sessions */
-const PATTERN_PENALTY_PER_OCCURRENCE = -1.3;
-/** Maximum total pattern penalty for any single movement */
-const PATTERN_PENALTY_CAP = -4.0;
+// ─── Goal → StimulusTag affinity table ───────────────────────────────────
 
-/** Score floor: movements below this score are excluded from the pool */
-const SCORE_FLOOR = -5.0;
-
-/** Maximum pool size for random pick (dynamic: capped by actual pool size) */
-const MAX_POOL_SIZE = 8;
-
-/** Minimum eligible movements before triggering fallback relaxation */
-const FALLBACK_THRESHOLD = 3;
-
-// SeededRng and dailySeed relocated to central utils/seed.ts
-
-// ─── Difficulty tiers vs Fitness levels ───────────────────────────────────
-const DIFFICULTY_RANK: Record<string, number> = { beginner: 0, intermediate: 1, advanced: 2, elite: 3 };
-const FITNESS_TO_DIFFICULTY: Record<string, string> = {
-    beginner: "beginner",
-    rx: "rx"
+const GOAL_TAG_AFFINITY: Record<string, string[]> = {
+    "competition":      ["strength", "power", "speed", "accuracy"],
+    "health":           ["endurance", "balance", "flexibility", "recovery"],
+    "weight loss":      ["engine", "endurance", "stamina"],
+    "general fitness":  ["strength", "endurance", "coordination", "balance"],
+    "strength":         ["strength", "power"],
+    "muscle":           ["strength", "power"],
+    "endurance":        ["endurance", "stamina", "engine"],
+    "flexibility":      ["flexibility", "balance"],
+    "mobility":         ["flexibility", "balance", "recovery"],
 };
+
+function goalTags(goals: string[]): Set<string> {
+    const out = new Set<string>();
+    for (const g of goals) {
+        const key = g.toLowerCase();
+        // Direct keyword match against affinity table
+        for (const [affKey, tags] of Object.entries(GOAL_TAG_AFFINITY)) {
+            if (key.includes(affKey) || affKey.includes(key)) {
+                for (const t of tags) out.add(t);
+            }
+        }
+    }
+    return out;
+}
 
 // ─── MovementScorer ───────────────────────────────────────────────────────
 
 /**
  * MovementScorer
  *
- * Scores every eligible FilteredMovement using:
- * - Goal alignment bonuses
- * - Skill calibration bonuses
- * - Exponential recency decay penalties
- * - Pattern repetition penalties (capped)
- * - Methodist Matrix modality bias adjustments
+ * Multi-factor deterministic scoring engine. All score components are additive:
  *
- * Then selects from the top-N dynamic pool using a daily deterministic seed —
- * no Math.random() in the core loop.
+ *  1. Fatigue decay     — penalises recently used movements  (-10 / -2 / -1 per 24h window)
+ *  2. Pattern family    — penalises over-used movement families (-1.3/use, capped -4.0)
+ *  3. Methodist Matrix  — balances G/W/M distribution over 3 sessions (±2.0)
+ *  4. Goal alignment    — rewards movements matching athlete goals (+3.0 max)
+ *  5. Skill calibration — rewards appropriate difficulty for fitness level (+1.0 max)
+ *
+ * No Math.random(). Seeded picks use FNV → LCG (src/utils/seed.ts).
  */
 export class MovementScorer {
 
+    // ─── Public API ───────────────────────────────────────────────────────
+
     /**
-     * Score and rank all candidates. Returns them sorted best-first.
-     * Applies exponential decay, pattern cap, and Methodist Matrix.
+     * Score and sort all candidate movements, best-first.
+     *
+     * @param movements         Pre-filtered candidates from MovementFilterService
+     * @param context           Pre-fetched HydratedContext
+     * @param availableEquipment User's equipment (reserved for future load penalty)
      */
     rankCandidates(
-        candidates: FilteredMovement[],
+        movements: FilteredMovement[],
         context: HydratedContext,
-        availableEquipment?: string[],
-    ): Array<{ movement: FilteredMovement; score: number }> {
-        // Pre-compute pattern frequency map across all history sessions
-        const patternFreq = this.buildPatternFreq(context);
+        _availableEquipment?: string[],
+    ): ScoredMovement[] {
+        const methodistBias = this.computeMethodistBias(context);
+        const derivedGoalTags = goalTags(context.goals);
 
-        // Pre-compute sets of recently used movement names (by age bucket)
-        const used24h = this.buildUsedSet(context, 0, 24);
-        const used48h = this.buildUsedSet(context, 24, 48);
-        const used72h = this.buildUsedSet(context, 48, 72);
-
-        // Methodist Matrix adjustments
-        const matrixAdj = methodistMatrix.getAdjustments(context.history);
-
-        const scored = candidates.map((fm) => ({
+        const scored = movements.map((fm) => ({
             movement: fm,
-            score: this.scoreOne(fm, context, patternFreq, used24h, used48h, used72h, matrixAdj, availableEquipment),
+            score: this.scoreMovement(fm, context, methodistBias, derivedGoalTags),
         }));
 
-        // Sort descending
+        // Sort descending — highest score first
         scored.sort((a, b) => b.score - a.score);
         return scored;
     }
 
     /**
-     * Pick one movement from the top-N pool using today's deterministic seed.
-     * Filters out movements below SCORE_FLOOR and already used names.
+     * Pick one movement from the ranked pool using a deterministic seeded RNG.
      *
-     * If fewer than FALLBACK_THRESHOLD candidates remain, automatically retries
-     * with relaxed penalties (FALLBACK_DECAY_FACTOR applied).
+     * @param ranked            Output of rankCandidates
+     * @param usedNames         Set of already-selected movement names (mutated on pick)
+     * @param userId            For seed generation
+     * @param salt              Daily salt for seed variety
+     * @param modality          If provided, restrict to this G/W/M modality
+     * @param allowRepeat       If false, skip movements already in usedNames
+     * @param movementComplexity Complexity filter: simple | moderate | advanced
      */
     pickOne(
-        ranked: Array<{ movement: FilteredMovement; score: number }>,
+        ranked: ScoredMovement[],
         usedNames: Set<string>,
         userId: string,
-        salt: string = "",
-        allowedModality?: string,
-        isFallback = false
+        salt: string,
+        modality?: "G" | "W" | "M",
+        allowRepeat: boolean = false,
+        movementComplexity: "simple" | "moderate" | "advanced" = "moderate",
     ): FilteredMovement | null {
-        // Drop the floor to -10 in fallback (allows 48h/72h penalties to pass)
-        // BUT strictly prevents 24h penalties (which are now -10 + negative pattern penalties)
-        const floor = isFallback ? SCORE_FLOOR * 2 : SCORE_FLOOR;
-
-        const pool = ranked.filter(({ movement, score }) => {
-            const name = movement.resolvedName.toLowerCase();
-            if (usedNames.has(name)) return false;
-
-            // STRICT BAN: Never allow a movement that used the 24h DECAY penalty
-            if (score <= DECAY_24H) return false;
-
-            if (score < floor) return false;
-            if (allowedModality) {
-                const mod = (movement.movement as unknown as { modality: string }).modality;
-                if (mod !== allowedModality) return false;
+        // ── 1. Filter pool ────────────────────────────────────────────────
+        const pool = ranked.filter(({ movement: fm }) => {
+            if (!allowRepeat && usedNames.has(fm.resolvedName)) return false;
+            if (modality) {
+                const mod = (fm.movement as unknown as { modality: string }).modality;
+                if (mod !== modality) return false;
             }
-            return true;
+            return this.passesComplexityFilter(fm, movementComplexity);
         });
 
         if (pool.length === 0) return null;
 
-        // Trigger fallback if pool is too small and we're not already in it
-        if (!isFallback && pool.length < FALLBACK_THRESHOLD) {
-            return this.pickOne(ranked, usedNames, userId, salt, allowedModality, true);
-        }
+        // ── 2. Take top-N slice ───────────────────────────────────────────
+        const topN = pool.slice(0, Math.min(PICK_POOL_SIZE, pool.length));
 
-        // Dynamic top-N slice — safe for tiny pools (e.g. jump-rope only)
-        const topN = pool.slice(0, Math.min(MAX_POOL_SIZE, pool.length));
+        // ── 3. Seeded deterministic pick ──────────────────────────────────
+        // Mix usedNames.size into the seed so each slot gets a distinct pick.
+        const base = dailySeed(userId, salt);
+        const mixedSeed = (base ^ (usedNames.size * 0x9e3779b9)) >>> 0;
+        const rng = new SeededRng(mixedSeed);
+        const idx = Math.floor(rng.next() * topN.length);
+        const picked = topN[idx].movement;
 
-        const rng = new SeededRng(dailySeed(userId, salt) + usedNames.size);
-        const chosen = rng.choice(topN);
-
-        usedNames.add(chosen.movement.resolvedName.toLowerCase());
-        return chosen.movement;
+        usedNames.add(picked.resolvedName);
+        return picked;
     }
 
-    // ── Private Helpers ──────────────────────────────────────────────────
+    // ─── Scoring ──────────────────────────────────────────────────────────
 
-    private scoreOne(
+    private scoreMovement(
         fm: FilteredMovement,
         context: HydratedContext,
-        patternFreq: Map<string, number>,
-        used24h: Set<string>,
-        used48h: Set<string>,
-        used72h: Set<string>,
-        matrixAdj: Record<string, number>,
-        availableEquipment?: string[]
+        methodistBias: Record<string, number>,
+        derivedGoalTags: Set<string>,
     ): number {
-        const mov = fm.movement as unknown as Record<string, unknown>;
-        const name = (mov.name as string).toLowerCase();
-        const modality = mov.modality as string;
+        let score = 0;
 
-        // IMovement uses stimulusTags (string[]) — e.g. "strength", "endurance"
-        // These map to the "effects" concept in the scoring plan.
-        const stimulusTags: string[] = Array.isArray(mov.stimulusTags)
-            ? (mov.stimulusTags as string[])
-            : [];
+        const movDoc = fm.movement as unknown as {
+            modality: string;
+            family?: string;
+            difficulty?: string;
+            stimulusTags?: string[];
+        };
 
-        // IMovement uses family (string | undefined) — e.g. "squat", "hinge"
-        // This is the single movement "pattern" for penalty tracking.
-        const family: string | undefined = typeof mov.family === "string"
-            ? mov.family
-            : undefined;
-
-        // ── Movement Demand Level ──────────────────────────────────────────
-        // NEW: use native difficulty if available, else fall back to inference
-        const isLoaded = Boolean(mov.isLoaded);
-
-        const nativeDifficulty = typeof mov.difficulty === "string" ? mov.difficulty : null;
-        const inferredDifficulty = nativeDifficulty ?? (isLoaded ? "rx" : "beginner");
-
-        let score = 0.0;
-
-        // ── Goal alignment (via stimulusTags) ──────────────────────────
-        if (context.goals.length > 0) {
-            const primaryGoal = context.goals[0].toLowerCase();
-            if (stimulusTags.map((t: string) => t.toLowerCase()).includes(primaryGoal)) {
-                score += 3.0;
-            }
-        }
-        // Broad utility bonus: movements covering multiple stimulus tags
-        if (stimulusTags.length >= 2) score += 1.0;
-
-        // ── Skill calibration (native diff vs user level) ─────────────────
-        const userLevel = context.fitnessLevel;
-        const idealDiff = FITNESS_TO_DIFFICULTY[userLevel] ?? "intermediate";
-
-        const currentDiffRank = DIFFICULTY_RANK[inferredDifficulty] ?? 1;
-        const idealDiffRank = DIFFICULTY_RANK[idealDiff] ?? 1;
-
-        if (currentDiffRank === idealDiffRank) {
-            score += 1.2; // Perfect match
-        } else if (currentDiffRank < idealDiffRank) {
-            score += 0.5; // Slightly easier is okay
-        } else {
-            // Over-challenging but passed filter? Small penalty
-            score -= 1.0;
-        }
-
-        // ── Equipment match penalty (missing gear = -10.0) ──────────────
-        if (availableEquipment) {
-            const required = (mov.equipmentRequired as string[]) ?? [];
-            if (required.length > 0) {
-                const hasAll = required.every(eq => availableEquipment.includes(eq));
-                if (!hasAll && !mov.bodyweightOnly) {
-                    score -= 10.0;
-                }
+        // ── 1. Fatigue decay (exponential per 24h window) ─────────────────
+        for (const session of context.history) {
+            const h = session.ageHours;
+            const decay =
+                h <= 24 ? FATIGUE_DECAY_24H :
+                h <= 48 ? FATIGUE_DECAY_48H :
+                h <= 72 ? FATIGUE_DECAY_72H : 0;
+            if (decay === 0) continue;
+            if (session.movementNames.includes(fm.resolvedName)) {
+                score += decay;
             }
         }
 
-        // ── Recovery modality penalty ───────────────────────────────────
-        if (modality === "recovery") score -= 2.5;
-
-        // ── Weightlifting Minimum Viability Bonus ───────────────────────
-        // To counter-act the sheer volume of bodyweight and cardio options,
-        // we give a small natural bump to W movements to ensure they show up.
-        if (modality === "W") score += 0.5;
-
-        // ── Exponential recency decay ───────────────────────────────────
-        if (used24h.has(name)) score += DECAY_24H;
-        else if (used48h.has(name)) score += DECAY_48H;
-        else if (used72h.has(name)) score += DECAY_72H;
-
-        // ── Pattern frequency penalty (capped, via movement family) ─────
-        let patternPenalty = 0.0;
+        // ── 2. Pattern family penalty (capped at -4.0) ────────────────────
+        const family = movDoc.family ?? "";
         if (family) {
-            const freq = patternFreq.get(family.toLowerCase()) ?? 0;
-            patternPenalty += PATTERN_PENALTY_PER_OCCURRENCE * freq;
+            const instances = context.history.filter((s) =>
+                s.patterns.includes(family)
+            ).length;
+            score -= Math.min(instances * PATTERN_PENALTY_PER, PATTERN_PENALTY_CAP);
         }
-        score += Math.max(patternPenalty, PATTERN_PENALTY_CAP);
 
-        // ── Methodist Matrix modality bias ──────────────────────────────
-        const modAdj = matrixAdj[modality as "G" | "W" | "M"];
-        if (typeof modAdj === "number") score += modAdj;
+        // ── 3. Methodist Matrix bias ──────────────────────────────────────
+        const modality = movDoc.modality;
+        if (modality in methodistBias) {
+            score += methodistBias[modality];
+        }
+
+        // ── 4. Goal alignment (+3.0 max) ──────────────────────────────────
+        const tags = movDoc.stimulusTags ?? [];
+        const matches = tags.filter((t) => derivedGoalTags.has(t.toLowerCase())).length;
+        score += Math.min(matches * GOAL_BONUS_PER_MATCH, GOAL_BONUS_MAX);
+
+        // ── 5. Skill calibration (+1.0 max) ──────────────────────────────
+        const diff = movDoc.difficulty;
+        const level = context.fitnessLevel;
+        if (level === "beginner") {
+            if (diff === "beginner") score += SKILL_BONUS_EXACT;
+            else if (diff === "intermediate") score += SKILL_BONUS_ADJACENT;
+        } else {
+            // rx
+            if (diff === "advanced" || diff === "elite") score += SKILL_BONUS_EXACT;
+            else if (diff === "intermediate") score += SKILL_BONUS_ADJACENT;
+        }
 
         return score;
     }
 
-    /** Build a frequency map of pattern occurrences across all history sessions */
-    private buildPatternFreq(context: HydratedContext): Map<string, number> {
-        const freq = new Map<string, number>();
-        for (const session of context.history) {
-            for (const pattern of session.patterns) {
-                const key = pattern.toLowerCase();
-                freq.set(key, (freq.get(key) ?? 0) + 1);
+    // ─── Methodist Matrix ─────────────────────────────────────────────────
+
+    /**
+     * Compute per-modality bias by analysing G/W/M distribution
+     * over the 3 most recent sessions.
+     *
+     * - Over-represented (share > 60%) → METHODIST_OVER_BIAS (-2.0)
+     * - Least-represented              → METHODIST_UNDER_BIAS (+2.0)
+     */
+    private computeMethodistBias(context: HydratedContext): Record<string, number> {
+        const bias: Record<string, number> = { G: 0, W: 0, M: 0 };
+
+        const recentSessions = context.history.slice(0, 3);
+        if (recentSessions.length === 0) return bias;
+
+        const counts: Record<string, number> = { G: 0, W: 0, M: 0 };
+        for (const s of recentSessions) {
+            for (const mod of s.modalities) {
+                if (mod in counts) counts[mod]++;
             }
         }
-        return freq;
+
+        const total = counts.G + counts.W + counts.M;
+        if (total === 0) return bias;
+
+        // Find least-represented modality
+        const minCount = Math.min(counts.G, counts.W, counts.M);
+
+        for (const mod of ["G", "W", "M"] as const) {
+            const share = counts[mod] / total;
+            if (share > METHODIST_OVER_THRESHOLD) {
+                bias[mod] = METHODIST_OVER_BIAS;
+            } else if (counts[mod] === minCount) {
+                // Only apply the under-bias to one modality if there's a clear winner
+                bias[mod] = METHODIST_UNDER_BIAS;
+            }
+        }
+
+        return bias;
     }
 
-    /** Build a set of movement names used within a given hour range */
-    private buildUsedSet(
-        context: HydratedContext,
-        minHours: number,
-        maxHours: number
-    ): Set<string> {
-        const set = new Set<string>();
-        for (const session of context.history) {
-            if (session.ageHours >= minHours && session.ageHours <= maxHours) {
-                for (const name of session.movementNames) {
-                    set.add(name.toLowerCase());
-                }
-            }
+    // ─── Complexity Filter ────────────────────────────────────────────────
+
+    /**
+     * Returns false if the movement is too complex for the given complexity level.
+     *
+     * - simple:   No loaded W movements at advanced/elite difficulty
+     *             (sprint sessions — high reps, no heavy barbell complexity)
+     * - moderate: No elite-difficulty movements
+     * - advanced: No restrictions
+     */
+    private passesComplexityFilter(
+        fm: FilteredMovement,
+        complexity: "simple" | "moderate" | "advanced",
+    ): boolean {
+        if (complexity === "advanced") return true;
+
+        const movDoc = fm.movement as unknown as {
+            modality: string;
+            difficulty?: string;
+            isLoaded?: boolean;
+        };
+        const { modality, difficulty, isLoaded } = movDoc;
+
+        if (complexity === "moderate") {
+            return difficulty !== "elite";
         }
-        return set;
+
+        // simple: exclude loaded W movements at advanced/elite difficulty
+        if (modality === "W" && isLoaded) {
+            return difficulty !== "advanced" && difficulty !== "elite";
+        }
+
+        return true;
     }
 }
 

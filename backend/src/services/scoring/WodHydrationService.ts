@@ -1,145 +1,157 @@
-import { Workout } from "../../models/Workout.js";
 import { User } from "../../models/User.js";
+import { Workout } from "../../models/Workout.js";
 import { movementCacheService } from "../MovementCacheService.js";
 import type { FitnessLevel } from "../../models/User.js";
-import type { Modality } from "../../models/Movement.js";
+import type { WodProtocol } from "../WodAssemblyService.js";
 
-// ─── Hydration Types ──────────────────────────────────────────────────────
+// ─── Session Summary (derived from Workout history) ───────────────────────
 
-/** A single session from the athlete's recent history, re-classified
- *  against the live movement library (not the stale DB movementEmphasis). */
-export interface HistoricalSession {
-    /** ISO date of the session */
-    date: Date;
-    /** Exact movement names that appeared in the WOD (from movementItems) */
-    movementNames: string[];
-    /** Movement families (e.g. "squat", "hinge") re-resolved from live library */
+export interface SessionSummary {
+    /** Protocol used in this session */
+    protocol?: WodProtocol;
+    /** Movement family tags (e.g. "squat", "hinge", "pull") */
     patterns: string[];
-    /** G / W / M modalities re-resolved from live library */
-    modalities: Modality[];
-    /** Age of the session in hours at call time */
+    /**
+     * G/W/M modalities — re-classified from the live movement library.
+     * Never read from stale DB fields.
+     */
+    modalities: string[];
+    /** Individual movement names as resolved for the athlete's level */
+    movementNames: string[];
+    /** How many hours ago this session was (relative to fetch date) */
     ageHours: number;
 }
 
-/** Pre-scored athlete context passed into WodAssemblyService */
+// ─── Hydrated Context (full coaching context, single DB round-trip) ───────
+
 export interface HydratedContext {
+    userId: string;
     fitnessLevel: FitnessLevel;
     goals: string[];
-    /** Up to 5 recent sessions, newest first (matches DB sort: _id: -1) */
-    history: HistoricalSession[];
-    /** True when the athlete has no recorded history (cold start) */
+    /** History sorted newest-first (lowest ageHours first) */
+    history: SessionSummary[];
+    /** True when the athlete has no recorded history */
     isColdStart: boolean;
 }
 
-// ─── Lookback window ─────────────────────────────────────────────────────
-const LOOKBACK_DAYS = 5;
-
 // ─── WodHydrationService ──────────────────────────────────────────────────
+
+const LOOKBACK_HOURS = 5 * 24; // 5-day window
+const MAX_HISTORY_FETCH = 10;   // hard cap on DB results
 
 /**
  * WodHydrationService
  *
- * Fetches the athlete profile and recent workout history in a single
- * Promise.all (anti-N+1). Re-classifies historical movements against
- * the LIVE in-memory movement library to ensure the Methodist Matrix
- * always uses up-to-date modality and pattern data.
+ * Single DB round-trip: fetches User + recent Workout history in a
+ * single Promise.all. Re-classifies each workout's movement modalities
+ * from the live in-memory library — never from stale DB values.
+ *
+ * The resulting HydratedContext is passed to all downstream scoring
+ * and variance services so they incur zero additional DB cost.
  */
 export class WodHydrationService {
-
     /**
-     * Fetch and build the HydratedContext for a given user.
-     * Throws a 404-shaped error if the user does not exist.
+     * Fetch and hydrate the full coaching context for a user.
+     *
+     * @param userId       The authenticated user's ID string
+     * @param dateOverride Optional date override (used by seed scripts / tests)
      */
-    async fetch(userId: string, nowOverride?: Date): Promise<HydratedContext> {
-        const now = nowOverride || new Date();
-        const cutoff = new Date(now);
-        cutoff.setDate(cutoff.getDate() - LOOKBACK_DAYS);
+    async fetch(userId: string, dateOverride?: Date): Promise<HydratedContext> {
+        const now = dateOverride ?? new Date();
 
-        // ── Single round-trip: user profile + raw workout history ──────
-        const [user, rawWorkouts] = await Promise.all([
-            User.findById(userId).select("fitnessLevel goals").lean(),
-            Workout.find({ userId, dateString: { $exists: true } })
+        // ── Single Promise.all: user + workout history + live library ─────
+        const [user, rawWorkouts, library] = await Promise.all([
+            User.findById(userId).lean(),
+            Workout.find({ userId })
                 .sort({ _id: -1 })
-                .limit(5)
-                // Pull structured movementItems for name + family extraction
-                .select("dateString timeString wod.movementItems.name wod.movementItems.family")
+                .limit(MAX_HISTORY_FETCH)
                 .lean(),
+            movementCacheService.getAll(),
         ]);
 
+        // Cold start — no user found (shouldn't happen; route validates first)
         if (!user) {
-            const err = new Error("User not found");
-            (err as NodeJS.ErrnoException).code = "USER_NOT_FOUND";
-            throw err;
-        }
-
-        // ── Cold start: return zero-penalty context ────────────────────
-        if (rawWorkouts.length === 0) {
             return {
-                fitnessLevel: user.fitnessLevel as FitnessLevel,
-                goals: user.goals ?? [],
+                userId,
+                fitnessLevel: "beginner",
+                goals: [],
                 history: [],
                 isColdStart: true,
             };
         }
 
-        // ── Live library lookup (0 extra DB cost — already in-memory) ──
-        const liveLibrary = await movementCacheService.getAll();
-        const byName = new Map(
-            liveLibrary.map((m) => [m.name.toLowerCase(), m])
-        );
-
-        const nowMs = now.getTime();
-
-        const history: HistoricalSession[] = rawWorkouts.map((w: any) => {
-            // Extract movement names from structured movementItems
-            const items: Array<{ name: string; family?: string }> = w.wod?.movementItems ?? [];
-            const movementNames: string[] = items.map((item) => item.name);
-
-            const modalities = new Set<Modality>();
-            const patterns = new Set<string>();
-
-            for (const item of items) {
-                const live = byName.get(item.name.trim().toLowerCase());
-                if (!live) continue;
-
-                // Re-classify modality from live library
-                modalities.add(live.modality as Modality);
-
-                // Use stored family if available, else fall back to live library
-                const family = item.family ?? (live as unknown as Record<string, unknown>).family as string | undefined;
-                if (family) patterns.add(family);
+        // ── Build name → modality map from live library ───────────────────
+        // Also map progression variants so resolved names are covered.
+        const modalityMap = new Map<string, string>();
+        for (const m of library) {
+            modalityMap.set(m.name.toLowerCase(), m.modality);
+            const doc = m as unknown as { progressions?: Array<{ variant: string }> };
+            for (const prog of doc.progressions ?? []) {
+                modalityMap.set(prog.variant.toLowerCase(), m.modality);
             }
+        }
 
-            // Estimate ageHours from dateString + timeString
-            const dateStr = w.dateString as string | undefined;
-            const timeStr = w.timeString as string | undefined;
-            let sessionDate: Date;
-            if (dateStr && timeStr) {
-                // Parse DD/MM/YYYY and HH:MM
-                const [dd, mm, yyyy] = dateStr.split("/").map(Number);
-                const [hh, min] = timeStr.split(":").map(Number);
-                sessionDate = new Date(yyyy, mm - 1, dd, hh, min);
-            } else {
-                // Fallback to createdAt or now
-                sessionDate = w.createdAt ? new Date(w.createdAt) : now;
-            }
-            const ageHours = (nowMs - sessionDate.getTime()) / (1000 * 60 * 60);
+        // ── Build SessionSummary for each workout within the lookback window
+        const history: SessionSummary[] = rawWorkouts
+            .map((w) => {
+                const ageHours = this.computeAgeHours(w.dateString, now);
+                return { w, ageHours };
+            })
+            .filter(({ ageHours }) => ageHours <= LOOKBACK_HOURS)
+            .map(({ w, ageHours }) => {
+                const items = (w.wod?.movementItems ?? []) as Array<{
+                    name: string;
+                    family?: string;
+                }>;
 
-            return {
-                date: sessionDate,
-                movementNames,
-                patterns: Array.from(patterns),
-                modalities: Array.from(modalities),
-                ageHours,
-            };
-        });
+                // Patterns = movement family tags from each item
+                const patterns = items
+                    .map((item) => item.family)
+                    .filter((f): f is string => Boolean(f));
+
+                // Modalities re-classified from live library
+                const modalities = [
+                    ...new Set(
+                        items
+                            .map((item) => modalityMap.get(item.name.toLowerCase()))
+                            .filter((mod): mod is string => Boolean(mod))
+                    ),
+                ];
+
+                // Movement names for fatigue decay scoring
+                const movementNames = items.map((item) => item.name);
+
+                return {
+                    protocol: w.wod?.type as WodProtocol | undefined,
+                    patterns,
+                    modalities,
+                    movementNames,
+                    ageHours,
+                } satisfies SessionSummary;
+            });
 
         return {
+            userId,
             fitnessLevel: user.fitnessLevel as FitnessLevel,
-            goals: user.goals ?? [],
+            goals: (user.goals ?? []) as string[],
             history,
-            isColdStart: false,
+            isColdStart: history.length === 0,
         };
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────
+
+    /**
+     * Compute session age in hours from a "DD/MM/YYYY" dateString.
+     * Uses calendar-day granularity (no time-of-day).
+     */
+    private computeAgeHours(dateString: string, now: Date): number {
+        const parts = dateString?.split("/");
+        if (!parts || parts.length !== 3) return 0;
+        const [dd, mm, yyyy] = parts.map(Number);
+        if (!dd || !mm || !yyyy) return 0;
+        const sessionDate = new Date(yyyy, mm - 1, dd);
+        return (now.getTime() - sessionDate.getTime()) / (1000 * 60 * 60);
     }
 }
 

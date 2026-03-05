@@ -1,33 +1,50 @@
 /**
- * Deterministic daily seed generator with optional salt.
+ * Deterministic daily seed utilities.
+ *
+ * dailySeed  — FNV-1a hash of "userId:YYYY-M-D:salt" → 32-bit unsigned integer.
+ * SeededRng  — LCG pseudo-random number generator seeded from dailySeed.
+ *
+ * Same user on the same calendar day always produces the same seed,
+ * so WOD generation is fully deterministic (no Math.random()).
  */
-export function dailySeed(userId: string, salt: string = "", overrideDate?: Date): number {
-    const now = overrideDate || new Date();
-    // Daily granularity + user identity + salt for variety
-    const str = `${now.getFullYear()}${now.getMonth()}${now.getDate()}${userId}${salt}`;
-    let h = 2166136261;
+
+/**
+ * FNV-1a 32-bit hash of an arbitrary string.
+ * Returns a 32-bit unsigned integer.
+ */
+function fnv1a32(str: string): number {
+    let hash = 2166136261; // FNV offset basis (32-bit)
     for (let i = 0; i < str.length; i++) {
-        h ^= str.charCodeAt(i);
-        h = Math.imul(h, 16777619);
+        hash ^= str.charCodeAt(i);
+        hash = Math.imul(hash, 16777619); // FNV prime
+        hash >>>= 0; // keep unsigned 32-bit
     }
-    return h >>> 0;
+    return hash;
 }
 
 /**
- * Minimal Seeded LCG for deterministic variety.
+ * Builds a deterministic integer seed from a userId, optional salt, and date.
+ * Defaults to today's calendar date in the server's local timezone.
+ */
+export function dailySeed(userId: string, salt: string = "", dateOverride?: Date): number {
+    const now = dateOverride ?? new Date();
+    const dateKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+    return fnv1a32(`${userId}:${dateKey}:${salt}`);
+}
+
+/**
+ * Linear Congruential Generator seeded from a 32-bit integer.
+ * Produces floats in [0, 1) via next().
  */
 export class SeededRng {
-    private state: number;
-    constructor(seed: number) { this.state = seed >>> 0; }
+    private s: number;
 
-    next(): number {
-        let t = (this.state += 0x6d2b79f5);
-        t = Math.imul(t ^ (t >>> 15), t | 1);
-        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    constructor(seed: number) {
+        this.s = seed >>> 0;
     }
 
-    choice<T>(arr: T[]): T {
-        return arr[Math.floor(this.next() * arr.length)];
+    next(): number {
+        this.s = (Math.imul(this.s, 1664525) + 1013904223) >>> 0;
+        return this.s / 4294967296;
     }
 }

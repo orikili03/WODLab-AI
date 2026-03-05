@@ -2,6 +2,8 @@ import type { FilteredMovement } from "./MovementFilterService.js";
 import { movementScorer } from "./scoring/MovementScorer.js";
 import { repTarget } from "./scoring/repTarget.js";
 import type { HydratedContext } from "./scoring/WodHydrationService.js";
+import { stimulusIntentService } from "./StimulusIntentService.js";
+import type { ModalityComposition, SlotRequirement } from "./StimulusIntentService.js";
 import { dailySeed, SeededRng } from "../utils/seed.js";
 import type mongoose from "mongoose";
 
@@ -23,15 +25,10 @@ export type WodProtocol =
 export type WodCategory = "sprint" | "metcon" | "long";
 export type RepScheme = number[] | "MAX_REPS";
 
-// ─── Structured Quantity & Load ───────────────────────────────────────────
+// ─── Structured Quantity ──────────────────────────────────────────────────
 export interface Quantity {
     value: number;
     unit: string;    // "reps" | "m" | "cal" | "sec"
-}
-
-export interface Load {
-    value: number;
-    unit: string;    // "kg" | "lb"
 }
 
 // ─── Movement Item (new structured format) ────────────────────────────────
@@ -40,7 +37,7 @@ export interface AssembledMovementItem {
     family?: string;
     name: string;
     quantity: Quantity;
-    load?: Load;
+    load?: number;      // kg — canonical unit; frontend converts to user preference
     isMaxReps: boolean;
 }
 
@@ -210,22 +207,22 @@ function parseDistanceToQuantity(distance: string): Quantity {
 }
 
 /**
- * Parses a repTarget weight string into a Load.
- * Examples: "50 kg" → { value: 50, unit: "kg" }
- *           "135 lb" → { value: 135, unit: "lb" }
+ * Parses a repTarget weight string into a canonical kg number.
+ * Examples: "50 kg"  → 50
+ *           "135 lb" → 61.2  (converted to kg)
  *           "RPE 7-8 (moderate-heavy)" → null (not a numeric load)
  */
-function parseWeightToLoad(weight: string): Load | null {
+function parseWeightToLoad(weight: string): number | null {
     const trimmed = weight.trim().toLowerCase();
 
     // RPE descriptors are not numeric loads
     if (trimmed.startsWith("rpe")) return null;
 
     const kgMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*kg$/);
-    if (kgMatch) return { value: parseFloat(kgMatch[1]), unit: "kg" };
+    if (kgMatch) return parseFloat(kgMatch[1]);
 
     const lbMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*lb$/);
-    if (lbMatch) return { value: parseFloat(lbMatch[1]), unit: "lb" };
+    if (lbMatch) return Math.round(parseFloat(lbMatch[1]) * 0.453592 * 10) / 10;
 
     return null;
 }
@@ -253,30 +250,41 @@ export class WodAssemblyService {
         salt: string = "",
         dateOverride?: Date
     ): Promise<GeneratedWorkout> {
-        // ── 1. Score all candidates with the Coach Brain ──────────────────
+        // ── 1. Resolve StimulusIntent (coach brain — pure, no DB) ─────────
+        const intent = stimulusIntentService.resolve(
+            category, context, userId, salt, dateOverride
+        );
+
+        // ── 2. Score all candidates with the Coach Brain ──────────────────
         const ranked = movementScorer.rankCandidates(movements, context, availableEquipment);
         const usedNames = new Set<string>();
 
-        // ── 2. Select protocol + duration (deterministic seeded pick) ─────
+        // ── 3. Select protocol + duration (seeded pick from constrained pool) ──
         const { protocol, duration, ladderType, scoringType } =
-            this.selectProtocolAndDuration(category, userId, salt, dateOverride);
+            this.selectProtocolAndDuration(category, userId, salt, intent.allowedProtocols, dateOverride);
 
         const config = TEMPLATES[protocol];
 
-        // ── 3. Pick movements per modality slot ──────────────────────────
+        // ── 4. Composition-directed slot fill ─────────────────────────────
+        //  Fill order: required → preferred → optional (excluded never entered)
         const selected: FilteredMovement[] = [];
         const targetCount = config.movementCount.max;
 
-        // Always try to fill one slot per modality first (G/W/M balance)
-        for (const modality of ["M", "G", "W"]) {
+        const fillOrder = this.buildFillOrder(intent.modalityComposition);
+        for (const { modality, requirement } of fillOrder) {
+            if (requirement === "excluded") continue;
             if (selected.length >= targetCount) break;
-            const pick = movementScorer.pickOne(ranked, usedNames, userId, salt, modality);
+            const pick = movementScorer.pickOne(
+                ranked, usedNames, userId, salt, modality, false, intent.movementComplexity
+            );
             if (pick) selected.push(pick);
         }
 
-        // Fill any remaining slots with best-available across all modalities
+        // Fill any remaining slots to hit the min count (best-available, no modality constraint)
         while (selected.length < config.movementCount.min) {
-            const pick = movementScorer.pickOne(ranked, usedNames, userId, salt);
+            const pick = movementScorer.pickOne(
+                ranked, usedNames, userId, salt, undefined, false, intent.movementComplexity
+            );
             if (!pick) break;
             selected.push(pick);
         }
@@ -315,10 +323,10 @@ export class WodAssemblyService {
             }
 
             // ── Build structured load ─────────────────────────────────────
-            let load: Load | undefined;
+            let load: number | undefined;
             if (prescription.weight) {
                 const parsed = parseWeightToLoad(prescription.weight);
-                if (parsed) load = parsed;
+                if (parsed !== null) load = parsed;
             }
 
             // ── Extract movement metadata ─────────────────────────────────
@@ -364,11 +372,19 @@ export class WodAssemblyService {
     }
 
     // ─── Protocol Dispatcher (seeded, deterministic) ──────────────────────
+
+    /**
+     * Select a protocol + duration from the constrained pool provided by StimulusIntent.
+     * Original weighted options are filtered down to `allowedProtocols` first;
+     * if none survive (shouldn't happen — StimulusIntent always returns a non-empty pool),
+     * falls back to the full original options for that category.
+     */
     private selectProtocolAndDuration(
         category: WodCategory,
         userId: string,
         salt: string = "",
-        dateOverride?: Date
+        allowedProtocols: WodProtocol[],
+        dateOverride?: Date,
     ): {
         protocol: WodProtocol;
         duration: number;
@@ -376,16 +392,22 @@ export class WodAssemblyService {
         scoringType?: "AMRAP" | "FOR_TIME";
     } {
         const rng = new SeededRng(dailySeed(userId, salt, dateOverride));
+        const allowedSet = new Set(allowedProtocols);
+
+        const constrain = (all: Array<{ p: WodProtocol; w: number }>) => {
+            const filtered = all.filter(o => allowedSet.has(o.p));
+            return filtered.length > 0 ? filtered : all; // safety fallback
+        };
 
         if (category === "sprint") {
-            const options: Array<{ p: WodProtocol; w: number }> = [
+            const all: Array<{ p: WodProtocol; w: number }> = [
                 { p: "21_15_9", w: 25 },
                 { p: "TABATA", w: 25 },
                 { p: "FOR_TIME", w: 20 },
                 { p: "STRENGTH_SINGLE", w: 15 },
                 { p: "LADDER", w: 15 },
             ];
-            const p = this.weightedPick(options, rng);
+            const p = this.weightedPick(constrain(all), rng);
             return {
                 protocol: p,
                 duration: p === "TABATA" ? 4 : 7,
@@ -395,14 +417,14 @@ export class WodAssemblyService {
         }
 
         if (category === "metcon") {
-            const options: Array<{ p: WodProtocol; w: number }> = [
+            const all: Array<{ p: WodProtocol; w: number }> = [
                 { p: "AMRAP", w: 24 },
                 { p: "EMOM", w: 28 },
                 { p: "FOR_TIME", w: 28 },
                 { p: "DEATH_BY", w: 10 },
                 { p: "LADDER", w: 10 },
             ];
-            const p = this.weightedPick(options, rng);
+            const p = this.weightedPick(constrain(all), rng);
 
             const durations = [8, 10, 12, 15, 18, 20];
             const duration = durations[Math.floor(rng.next() * durations.length)];
@@ -415,14 +437,14 @@ export class WodAssemblyService {
         }
 
         // Long / Aerobic
-        const options: Array<{ p: WodProtocol; w: number }> = [
+        const all: Array<{ p: WodProtocol; w: number }> = [
             { p: "CHIPPER", w: 30 },
             { p: "AMRAP", w: 20 },
             { p: "INTERVAL", w: 20 },
             { p: "STRENGTH_SETS", w: 15 },
             { p: "LADDER", w: 15 },
         ];
-        const p = this.weightedPick(options, rng);
+        const p = this.weightedPick(constrain(all), rng);
         const durations = [25, 30, 40];
         const duration = durations[Math.floor(rng.next() * durations.length)];
         const ladderVariants: Array<"ascending" | "descending" | "pyramid"> = [
@@ -439,6 +461,27 @@ export class WodAssemblyService {
             scoringType:
                 p === "LADDER" ? "FOR_TIME" : p === "CHIPPER" ? "FOR_TIME" : "AMRAP",
         };
+    }
+
+    // ─── Composition Slot Fill Helper ─────────────────────────────────────
+
+    /**
+     * Convert a ModalityComposition into an ordered fill sequence.
+     * Priority: required → preferred → optional (excluded entries are never yielded).
+     */
+    private buildFillOrder(
+        composition: ModalityComposition,
+    ): Array<{ modality: "G" | "W" | "M"; requirement: SlotRequirement }> {
+        const PRIORITY: Record<SlotRequirement, number> = {
+            required: 0,
+            preferred: 1,
+            optional: 2,
+            excluded: 3,
+        };
+        return (["G", "W", "M"] as const)
+            .map(m => ({ modality: m, requirement: composition[m] }))
+            .filter(entry => entry.requirement !== "excluded")
+            .sort((a, b) => PRIORITY[a.requirement] - PRIORITY[b.requirement]);
     }
 
     private shuffle<T>(array: T[], rng: SeededRng): T[] {

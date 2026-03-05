@@ -9,11 +9,24 @@ const quantitySchema = new Schema(
     { _id: false }
 );
 
-// ─── Load Sub-schema (supports future LB/KG user preference conversion) ───
-const loadSchema = new Schema(
+// ─── Performed Volume Sub-schema ──────────────────────────────────────────
+// Tracks what the athlete actually completed per movement.
+// repsPerRound: one entry per round — [15,15,15] for uniform, [21,15,9] for descending,
+//               or [1,2,...,N] for ladder/death-by progressions.
+// totalReps: pre-computed sum of repsPerRound (for fast aggregation queries).
+const performedVolumeSchema = new Schema(
     {
-        value: { type: Number, required: true },   // e.g. 60
-        unit: { type: String, required: true },     // "kg" | "lb"
+        repsPerRound: [{ type: Number }],           // array — one entry per completed round
+        totalReps:    { type: Number },              // sum(repsPerRound) — computed on save
+    },
+    { _id: false }
+);
+
+// ─── Performed Sub-schema (per movement item) ─────────────────────────────
+const performedSchema = new Schema(
+    {
+        volume: { type: performedVolumeSchema },
+        load:   { type: Number },                   // kg — actual weight used
     },
     { _id: false }
 );
@@ -22,11 +35,12 @@ const loadSchema = new Schema(
 const movementItemSchema = new Schema(
     {
         movementId: { type: Schema.Types.ObjectId, ref: "Movement" }, // link to library
-        family: { type: String },                   // e.g. "squat", "hinge", "pull"
-        name: { type: String, required: true },     // display name: "Thruster"
-        quantity: { type: quantitySchema, required: true },
-        load: { type: loadSchema },                 // optional — bodyweight moves have none
-        isMaxReps: { type: Boolean, default: false },
+        family:     { type: String },               // e.g. "squat", "hinge", "pull"
+        name:       { type: String, required: true }, // display name: "Thruster"
+        quantity:   { type: quantitySchema, required: true },
+        load:       { type: Number },               // kg — prescribed load (bodyweight = absent)
+        isMaxReps:  { type: Boolean, default: false },
+        performed:  { type: performedSchema },      // optional — filled post-workout
     },
     { _id: false }
 );
@@ -34,12 +48,26 @@ const movementItemSchema = new Schema(
 // ─── WOD Spec (the core workout structure) ────────────────────────────────
 const wodSpecSchema = new Schema(
     {
-        type: { type: String, required: true },     // "AMRAP", "EMOM", "FOR_TIME", etc.
-        duration: { type: Number },                 // minutes (protocol time cap / length)
-        rounds: { type: Number },                   // for RFT / EMOM (null for AMRAPs)
-        movementItems: [movementItemSchema],        // structured movement data
-        ladderType: { type: String },               // "ascending" | "descending" | "pyramid"
-        scoringType: { type: String },              // "AMRAP" | "FOR_TIME"
+        type:          { type: String, required: true }, // "AMRAP", "EMOM", "FOR_TIME", etc.
+        duration:      { type: Number },                 // minutes (protocol time cap / length)
+        rounds:        { type: Number },                 // for RFT / EMOM (null for AMRAPs)
+        movementItems: [movementItemSchema],             // structured movement data
+        ladderType:    { type: String },                 // "ascending" | "descending" | "pyramid"
+        scoringType:   { type: String },                 // "AMRAP" | "FOR_TIME"
+    },
+    { _id: false }
+);
+
+// ─── Session Sub-schema (completion data captured at end of workout) ───────
+// totalSeconds: actual elapsed time — meaningful for FOR_TIME / INTERVAL / CHIPPER;
+//               for AMRAP/EMOM the duration is fixed, so derive rounds from performed.
+// rx: did the athlete complete the workout at prescribed weight/movement standards?
+// notes: optional freeform — useful for coach agent context in Phase 2.
+const sessionSchema = new Schema(
+    {
+        totalSeconds: { type: Number },
+        rx:           { type: Boolean, required: true },
+        notes:        { type: String },
     },
     { _id: false }
 );
@@ -75,8 +103,15 @@ export interface IWorkout extends Document {
             family?: string;
             name: string;
             quantity: { value: number; unit: string };
-            load?: { value: number; unit: string };
+            load?: number;                          // kg — prescribed load
             isMaxReps?: boolean;
+            performed?: {
+                volume?: {
+                    repsPerRound?: number[];        // one entry per completed round
+                    totalReps?: number;             // pre-computed: sum(repsPerRound)
+                };
+                load?: number;                      // kg — actual weight used
+            };
         }>;
         ladderType?: string;
         scoringType?: string;
@@ -84,8 +119,11 @@ export interface IWorkout extends Document {
 
     // --- Performance Tracking ---
     completedAt?: Date;                             // null = not done; Date = finished
-    scoreValue?: number;                            // total reps equivalent (e.g. 212)
-    scoreString?: string;                           // human-readable (e.g. "8 rounds + 12 reps")
+    session?: {
+        totalSeconds?: number;                      // FOR_TIME / INTERVAL actual elapsed
+        rx: boolean;                                // completed at prescribed standards?
+        notes?: string;                             // freeform athlete note
+    };
     rpe?: number;                                   // 1-5 scale
 
     createdAt: Date;
@@ -124,9 +162,8 @@ const workoutSchema = new Schema<IWorkout>(
 
         // --- Performance Tracking ---
         completedAt: { type: Date },
-        scoreValue: { type: Number },
-        scoreString: { type: String },
-        rpe: { type: Number, min: 1, max: 5 },
+        session:     { type: sessionSchema },
+        rpe:         { type: Number, min: 1, max: 5 },
     },
     { timestamps: true }
 );

@@ -17,32 +17,21 @@ interface WorkoutSummaryProps {
 
 export function WorkoutSummary({ workout, result, onClose }: WorkoutSummaryProps) {
     const [rpe, setRpe] = useState(3);
+    const [rx, setRx] = useState(false);
+    const [notes, setNotes] = useState("");
     const completeMutation = useCompleteWorkout();
     const queryClient = useQueryClient();
-
-    // Build a human-readable score string from the session result
-    const buildScoreString = (): string | undefined => {
-        if (result.roundsCompleted > 0) {
-            return `${result.roundsCompleted} rounds`;
-        }
-        return undefined;
-    };
-
-    // Calculate total reps equivalent for scoreValue
-    const buildScoreValue = (): number | undefined => {
-        if (result.roundsCompleted > 0) {
-            return result.roundsCompleted;
-        }
-        return Math.round(result.totalElapsed);  // seconds as fallback for FOR_TIME
-    };
 
     const handleSave = () => {
         completeMutation.mutate(
             {
                 workoutId: workout.id,
-                scoreValue: buildScoreValue(),
-                scoreString: buildScoreString(),
                 rpe,
+                session: {
+                    totalSeconds: Math.round(result.totalElapsed),
+                    rx,
+                    notes: notes.trim() || undefined,
+                },
             },
             {
                 onSuccess: () => {
@@ -90,28 +79,64 @@ export function WorkoutSummary({ workout, result, onClose }: WorkoutSummaryProps
                 )}
             </div>
 
-            {/* RPE slider (1-5 scale) */}
-            <div className="w-full card">
-                <h3 className="text-xs uppercase tracking-widest text-ds-text-muted mb-3">
-                    How hard was it?
-                </h3>
-                <div className="flex items-center gap-3">
+            {/* RPE + Rx + Notes card */}
+            <div className="w-full card space-y-4">
+                {/* RPE slider (1–5 scale) */}
+                <div>
+                    <h3 className="text-xs uppercase tracking-widest text-ds-text-muted mb-3">
+                        How hard was it?
+                    </h3>
+                    <div className="flex items-center gap-3">
+                        <input
+                            type="range"
+                            min={1}
+                            max={5}
+                            step={1}
+                            value={rpe}
+                            onChange={(e) => setRpe(Number(e.target.value))}
+                            className="flex-1 h-1.5 rounded-full cursor-pointer"
+                            style={{ accentColor: "#f59e0b" }}
+                        />
+                        <span className="w-8 text-center text-lg font-bold text-ds-text tabular-nums">{rpe}</span>
+                        <span className="text-xs text-ds-text-muted">RPE</span>
+                    </div>
+                    <div className="flex justify-between mt-1 text-[10px] text-ds-text-faint px-0.5">
+                        <span>Easy</span>
+                        <span>Max effort</span>
+                    </div>
+                </div>
+
+                {/* Rx checkbox */}
+                <label className="flex items-center gap-3 cursor-pointer select-none">
                     <input
-                        type="range"
-                        min={1}
-                        max={5}
-                        step={1}
-                        value={rpe}
-                        onChange={(e) => setRpe(Number(e.target.value))}
-                        className="flex-1 h-1.5 rounded-full cursor-pointer"
+                        type="checkbox"
+                        checked={rx}
+                        onChange={(e) => setRx(e.target.checked)}
+                        className="h-4 w-4 rounded border-ds-border cursor-pointer"
                         style={{ accentColor: "#f59e0b" }}
                     />
-                    <span className="w-8 text-center text-lg font-bold text-ds-text tabular-nums">{rpe}</span>
-                    <span className="text-xs text-ds-text-muted">RPE</span>
-                </div>
-                <div className="flex justify-between mt-1 text-[10px] text-ds-text-faint px-0.5">
-                    <span>Easy</span>
-                    <span>Max effort</span>
+                    <span className="text-ds-body-sm text-ds-text">
+                        Completed at prescribed weight (Rx)
+                    </span>
+                </label>
+
+                {/* Notes textarea */}
+                <div>
+                    <label
+                        htmlFor="workout-notes"
+                        className="block text-xs uppercase tracking-widest text-ds-text-muted mb-2"
+                    >
+                        Notes (optional)
+                    </label>
+                    <textarea
+                        id="workout-notes"
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="How did it feel? Any scaling notes…"
+                        rows={2}
+                        maxLength={400}
+                        className="w-full resize-none rounded-ds-md border border-ds-border bg-ds-bg px-3 py-2 text-ds-body-sm text-ds-text placeholder:text-ds-text-muted focus:border-ds-border-strong focus:outline-none focus:ring-1 focus:ring-ds-border-strong"
+                    />
                 </div>
             </div>
 

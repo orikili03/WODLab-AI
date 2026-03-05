@@ -176,22 +176,24 @@ router.get("/history", (async (req: AuthenticatedRequest, res: Response) => {
 // ─── POST /workouts/complete ──────────────────────────────────────────────
 const completeSchema = z.object({
     workoutId: z.string(),
-    scoreValue: z.number().optional(),
-    scoreString: z.string().optional(),
     rpe: z.number().min(1).max(5).optional(),
+    session: z.object({
+        totalSeconds: z.number().optional(),
+        rx: z.boolean(),
+        notes: z.string().optional(),
+    }).optional(),
 });
 
 router.post("/complete", (async (req: AuthenticatedRequest, res: Response) => {
     try {
-        const { workoutId, scoreValue, scoreString, rpe } = completeSchema.parse(req.body);
+        const { workoutId, rpe, session } = completeSchema.parse(req.body);
 
         const workout = await Workout.findOneAndUpdate(
             { _id: workoutId, userId: req.userId },
             {
                 $set: {
                     completedAt: new Date(),
-                    ...(scoreValue !== undefined && { scoreValue }),
-                    ...(scoreString !== undefined && { scoreString }),
+                    ...(session !== undefined && { session }),
                     ...(rpe !== undefined && { rpe }),
                 },
             },

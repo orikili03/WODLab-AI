@@ -7,6 +7,39 @@ import { WodBlock } from "../components/wod/WodBlock";
 import { formatProtocol } from "../lib/formatters";
 import type { WorkoutResponse } from "../domains/workouts/api";
 
+/** Derive a compact score string from session + performed data, protocol-aware.
+ *  Does NOT include RX — render the RX badge separately via workout.session?.rx. */
+function deriveScoreDisplay(workout: WorkoutResponse): string | undefined {
+    if (!workout.completedAt) return undefined;
+
+    const type  = workout.wod.type;
+    const s     = workout.session;
+    const first = workout.wod.movementItems[0]?.performed;
+
+    if (["FOR_TIME", "21_15_9", "CHIPPER", "INTERVAL"].includes(type)) {
+        if (s?.totalSeconds != null) {
+            const m   = Math.floor(s.totalSeconds / 60);
+            const sec = s.totalSeconds % 60;
+            return `${m}:${String(sec).padStart(2, "0")}`;
+        }
+    } else if (["AMRAP", "EMOM", "DEATH_BY", "LADDER"].includes(type)) {
+        const rounds = first?.volume?.repsPerRound?.length;
+        if (rounds) return `${rounds} rounds`;
+    } else if (type === "TABATA") {
+        const rpr = first?.volume?.repsPerRound;
+        if (rpr && rpr.length > 0) {
+            const avg = Math.round(rpr.reduce((a, b) => a + b, 0) / rpr.length);
+            return `${avg} reps avg`;
+        }
+    } else if (type === "STRENGTH_SINGLE") {
+        if (first?.load != null) return `${first.load} kg (1RM)`;
+    } else if (type === "STRENGTH_SETS") {
+        if (first?.load != null) return `${first.load} kg`;
+    }
+
+    return workout.completedAt ? "Complete" : undefined;
+}
+
 function filterHistory(
     list: WorkoutResponse[],
     searchQuery: string,
@@ -227,9 +260,9 @@ export function HistoryPage() {
                                         {(w.wod.duration ?? w.durationMinutes) != null && (w.wod.duration ?? w.durationMinutes) > 0 && (
                                             <> • {(w.wod.duration ?? w.durationMinutes)} min</>
                                         )}
-                                        {w.completedAt && w.scoreString && (
+                                        {deriveScoreDisplay(w) && (
                                             <span className="text-ds-text-muted font-normal">
-                                                {" · "}{w.scoreString}
+                                                {" · "}{deriveScoreDisplay(w)}
                                             </span>
                                         )}
                                     </div>
@@ -481,14 +514,24 @@ export function HistoryPage() {
                             {viewWorkout.completedAt && (
                                 <div className="rounded-ds-lg border border-ds-border bg-ds-surface-subtle p-4 space-y-2">
                                     <p className="text-xs uppercase tracking-wider text-ds-text-muted font-medium">Your result</p>
-                                    <div className="flex flex-wrap gap-4 text-ds-text">
-                                        {viewWorkout.scoreString && (
-                                            <span><strong>Score</strong> {viewWorkout.scoreString}</span>
+                                    <div className="flex flex-wrap items-center gap-4 text-ds-text">
+                                        {deriveScoreDisplay(viewWorkout) && (
+                                            <span><strong>Score</strong> {deriveScoreDisplay(viewWorkout)}</span>
                                         )}
                                         {viewWorkout.rpe != null && (
                                             <span><strong>RPE</strong> {viewWorkout.rpe}/5</span>
                                         )}
+                                        {viewWorkout.session?.rx && (
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold tracking-wider bg-amber-400/15 text-amber-400 border border-amber-400/25">
+                                                RX
+                                            </span>
+                                        )}
                                     </div>
+                                    {viewWorkout.session?.notes && (
+                                        <p className="text-ds-body-sm text-ds-text-muted pt-1">
+                                            {viewWorkout.session.notes}
+                                        </p>
+                                    )}
                                 </div>
                             )}
                         </div>

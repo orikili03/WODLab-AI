@@ -3,109 +3,106 @@ import type { FitnessLevel } from "../../models/User.js";
 
 // ─── Rep Prescription ─────────────────────────────────────────────────────
 
-/**
- * RepPrescription is the structured output of repTarget().
- *
- * IMPORTANT — Frontend Compatibility:
- *   MovementItemSpec.reps is typed as `number` (Zod: z.number()).
- *   We NEVER put a string into `reps`.
- *   For Monostructural movements, use `distance` (optional string field on
- *   MovementItemSpec) — WodBlock.tsx already renders `{distance} {name}`
- *   when distance is set, and ignores `reps` entirely in that branch.
- */
 export interface RepPrescription {
-    /** Integer rep count. Set to 0 when distance overrides rendering. */
+    /** Rep count for rep-based movements; 0 for distance-based monostructural */
     reps: number;
-    /** E.g. "200 m", "12/10 cal" — used for Monostructural movements. */
+    /** Distance string for monostructural movements (e.g. "400 m", "12/10 cal") */
     distance?: string;
-    /** E.g. "50 kg", "RPE 7-8" — used for loaded Weightlifting movements. */
+    /** Weight string for loaded movements (e.g. "60 kg") */
     weight?: string;
 }
 
-// ─── Rep Target Logic ─────────────────────────────────────────────────────
+// ─── Monostructural Distance Table ───────────────────────────────────────
+
+interface MonoDistance { rx: string; beginner: string }
+
+const MONO_BY_NAME: Array<[string | RegExp, MonoDistance]> = [
+    // Running
+    [/\brun\b|\bsprint\b/,             { rx: "400 m",     beginner: "200 m" }],
+    // Rowing
+    [/\brow\b|\browing\b/,             { rx: "500 m",     beginner: "250 m" }],
+    // Ski Erg
+    [/ski\s*erg/,                       { rx: "12/10 cal", beginner: "8/6 cal" }],
+    // Assault / Air bike variants
+    [/assault\s*bike|air\s*bike/,       { rx: "12/10 cal", beginner: "8/6 cal" }],
+    // Bike erg / Echo bike / Generic cycle
+    [/bike\s*erg|echo\s*bike|cycle\b/,  { rx: "15/12 cal", beginner: "10/8 cal" }],
+    // Double unders — rep-based, handled separately
+    // Single unders / Jump rope — rep-based, handled separately
+];
+
+// ─── repTarget ────────────────────────────────────────────────────────────
 
 /**
- * repTarget
+ * Returns a modality-aware rep/distance/weight prescription for a movement.
  *
- * Returns a modality-aware RepPrescription for a given movement + level.
- * Replaces the static `repSchemes[]` arrays in the old WodAssemblyService.
- *
- * Modality rules:
- *   M (Monostructural) → distance / calories in `distance` field; reps = 0
- *   W (Weightlifting)  → integer reps + optional weight string
- *   G (Gymnastics)     → integer reps scaled to difficulty
+ * Routing:
+ *  - Monostructural (M) with a known machine/distance → distance string, reps = 0
+ *  - Monostructural jump rope / double under → rep count only
+ *  - Weightlifting (W) → reps + optional weight (from defaultLoadKg or fallback)
+ *  - Gymnastics (G) → reps only
  */
-export function repTarget(movement: IMovement, level: FitnessLevel): RepPrescription {
-    const name = movement.name.toLowerCase();
-    const modality = movement.modality;
-    const difficulty = (movement as unknown as Record<string, string>).difficulty ?? "intermediate";
+export function repTarget(movement: IMovement, fitnessLevel: FitnessLevel): RepPrescription {
+    const isRx = fitnessLevel === "rx";
+    const nameLower = movement.name.toLowerCase();
+    const { modality, isLoaded, defaultLoadKg, stimulusTags } = movement;
 
-    // ── Monostructural ──────────────────────────────────────────────────
+    // ── Monostructural (M) ────────────────────────────────────────────────
     if (modality === "M") {
-        if (name.includes("run") || name.includes("sprint")) {
-            return { reps: 0, distance: "200 m" };
+        // Double unders / jump rope are rep-based, not distance-based
+        if (nameLower.includes("double under")) {
+            return { reps: isRx ? 50 : 30 };
         }
-        if (name.includes("row") || name.includes("bike erg") || name.includes("ski")) {
-            const cals = level === "rx" ? "15/12 cal" : "12/10 cal";
-            return { reps: 0, distance: cals };
+        if (nameLower.includes("single under") || nameLower.includes("jump rope")) {
+            return { reps: isRx ? 100 : 60 };
         }
-        if (name.includes("assault bike")) {
-            return { reps: 0, distance: "10/8 cal" };
+
+        // Distance-based — try name table
+        for (const [pattern, distances] of MONO_BY_NAME) {
+            const matches = typeof pattern === "string"
+                ? nameLower.includes(pattern)
+                : pattern.test(nameLower);
+            if (matches) {
+                return {
+                    reps: 0,
+                    distance: isRx ? distances.rx : distances.beginner,
+                };
+            }
         }
-        if (name.includes("double under")) {
-            return { reps: 30 };
-        }
-        if (name.includes("jump rope") || name.includes("single under")) {
-            return { reps: 60 };
-        }
-        if (name.includes("swim")) {
-            return { reps: 0, distance: "50 m" };
-        }
-        if (name.includes("shuttle")) {
-            return { reps: 0, distance: "5-10-15 m" };
-        }
-        // Fallback for any other monostructural
-        return { reps: 0, distance: "12/10 cal" };
+
+        // Generic monostructural fallback → treat as a run
+        return { reps: 0, distance: isRx ? "400 m" : "200 m" };
     }
 
-    // ── Weightlifting ───────────────────────────────────────────────────
+    // ── Weightlifting (W) ─────────────────────────────────────────────────
     if (modality === "W") {
-        const reps = difficulty === "advanced" ? 6 : level === "beginner" ? 8 : 10;
+        const isStrength =
+            stimulusTags.includes("strength") || stimulusTags.includes("power");
 
-        // Resolve load from defaultLoadKg if available, otherwise RPE descriptor
-        const loadKg = movement.defaultLoadKg?.[level];
-        const weight = loadKg
-            ? `${loadKg} kg`
-            : reps <= 6
-                ? "RPE 8-9 (heavy)"
-                : "RPE 7-8 (moderate-heavy)";
+        const reps = isStrength
+            ? (isRx ? 5 : 8)
+            : (isRx ? 10 : 12);
+
+        // Weight: prefer movement's defaultLoadKg, fall back to generic prescription
+        let weight: string | undefined;
+        if (defaultLoadKg) {
+            const loadKg = isRx ? defaultLoadKg.rx : defaultLoadKg.beginner;
+            if (loadKg !== undefined) {
+                weight = `${loadKg} kg`;
+            }
+        }
+        if (!weight && isLoaded) {
+            weight = isRx ? "60 kg" : "40 kg";
+        }
 
         return { reps, weight };
     }
 
-    // ── Gymnastics ──────────────────────────────────────────────────────
-    if (modality === "G") {
-        let reps: number;
-        if (difficulty === "advanced") {
-            reps = 5;
-        } else if (difficulty === "intermediate") {
-            reps = 10;
-        } else {
-            // beginner
-            reps = 14;
-        }
+    // ── Gymnastics (G) ────────────────────────────────────────────────────
+    const isSkill = stimulusTags.includes("skill") || stimulusTags.includes("coordination");
+    const reps = isSkill
+        ? (isRx ? 5 : 3)
+        : (isRx ? 10 : 8);
 
-        // Carries and holds: use distance/time instead of reps
-        if (name.includes("plank") || name.includes("hold")) {
-            return { reps: 0, distance: "30 sec" };
-        }
-        if (name.includes("walk") && !name.includes("lunge")) {
-            return { reps: 0, distance: "10 m" };
-        }
-
-        return { reps };
-    }
-
-    // ── Recovery (should not normally appear in metcon) ─────────────────
-    return { reps: 0, distance: "45 sec" };
+    return { reps };
 }
