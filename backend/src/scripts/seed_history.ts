@@ -60,13 +60,14 @@ interface CompletionStats {
 
 // ─── Session Stats Generator ──────────────────────────────────────────────
 function generateCompletionStats(
-    protocol: WodProtocol,
+    wod: any,
     category: WodCategory,
-    durationMinutes: number,
     fitnessLevel: FitnessLevel,
     daySeed: number,
-    wodRounds?: number,
 ): CompletionStats {
+    const protocol = wod.protocol;
+    const dur = wod.duration || 10;
+    const wodRounds = wod.rounds;
     const rng = makeRng(daySeed);
     const isRx = fitnessLevel === "rx";
     const rx = true; // all seeded workouts marked as completed at prescribed weight
@@ -80,7 +81,7 @@ function generateCompletionStats(
     const [rpeMin, rpeMax] = rpeBase[category];
     const rpe = Math.round(rpeMin + rng() * (rpeMax - rpeMin));
 
-    const dur = durationMinutes || 10;
+
 
     switch (protocol) {
         case "AMRAP": {
@@ -128,6 +129,14 @@ function generateCompletionStats(
             return { session: { rx }, rpe, _strengthKg: kg };
         }
         case "INTERVAL": {
+            // If the generator properly recorded work/rest windows, use them to calculate session rounds
+            if (wod.intervalWorkSec && wod.intervalRestSec) {
+                const totalCycleSec = wod.intervalWorkSec + wod.intervalRestSec;
+                const intervalCount = Math.max(1, Math.floor((dur * 60) / totalCycleSec));
+                const totalWorkSec = intervalCount * wod.intervalWorkSec;
+                return { session: { totalSeconds: totalWorkSec, rx }, rpe, _rounds: intervalCount };
+            }
+            // Fallback
             const avgSec = isRx ? Math.round(52 + rng() * 20) : Math.round(68 + rng() * 25);
             const intervalCount = Math.max(1, Math.round(dur / (avgSec / 60)));
             return { session: { totalSeconds: avgSec * intervalCount, rx }, rpe, _rounds: intervalCount };
@@ -318,12 +327,10 @@ async function seedHistory() {
             );
 
             const stats = generateCompletionStats(
-                generated.wod.protocol,
+                generated.wod,
                 category,
-                generated.wod.duration || 0,
                 athlete.level,
                 date.getTime(),
-                generated.wod.rounds,
             );
 
             // Enrich movementItems with performed data

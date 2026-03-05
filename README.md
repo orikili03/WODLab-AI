@@ -15,11 +15,12 @@ The source of truth for all movements, categorized by modality (G/W/M), family (
 ### Pillar 2: The Rules Engine & Coach Brain (Scoring Layer)
 - **Stimulus-First Protocol Selection:** `StimulusIntentService` reads coach context (recent sessions, modality heat, energy system distribution) and constrains the protocol pool before any selection — the engine decides *what stimulus the athlete needs* before picking *which protocol delivers it*.
 - **Deterministic Coach Engine:** Scores every candidate movement using a multi-factor algorithm:
-  - **Exponential Fatigue Decay:** Penalises exact movement repeats (-10 within 24h, -2 within 48h, -1 within 72h).
+  - **7-Day Fatigue Decay:** Penalises exact movement repeats (-20 within 24h, -5 within 48h, -2 within 72h) and hard-exiles movements seen 2+ times in the last 7 days (-25 point cap).
+  - **Dynamic Collision Anti-Patterns:** Aggressively penalises combining multiple `locomotion` or `carry` movements within the same session.
   - **Pattern Capping:** Penalises movement-family repetition (e.g., back-to-back squat days) with a hard cap.
   - **Methodist Modality Balance:** Enforces G/W/M (Gymnastics / Weightlifting / Monostructural) balance over a 3-session microcycle with ±2.0 bias adjustments.
   - **Goal Alignment:** Rewards movements that match the athlete's primary training goal.
-  - **Skill Calibration:** Rewards movements that match the athlete's fitness level.
+  - **Strict Skill Calibration:** Rewards movements matching the fitness level, and completely locks Beginners out of Advanced/Elite movements.
 - **Protocol Blueprint Matrix:** Maps every protocol × stimulus × tier to coaching-doctrine prescriptions: duration range, movement count, rep multiplier, load fraction, and protocol-specific parameters (EMOM work windows, interval timing). Replaces flat lookup tables with principled playbook entries.
 - **Stimulus-Aware Prescriptions:** `stimulusRepTarget()` scales reps and load per the blueprint — a sprint AMRAP gets lower reps and lighter load than an aerobic AMRAP; EMOM reps are capped to fit within the work window.
 - **Live Library Re-classification:** Historical workouts are re-tagged against the current movement library at hydration time, preventing stale modality data from skewing the matrix.
