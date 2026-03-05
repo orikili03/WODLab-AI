@@ -2532,9 +2532,9 @@ const testMovements = [
             "Bear-hug carry",
             "Carry with step-over"
         ],
-        "isLoaded": false,
-        "description": "",
-        "cues": []
+        "isLoaded": true,
+        "description": "Front-loaded carry for total-body stamina.",
+        "cues": ["Brace core", "Control the load"]
     },
     {
         "name": "Farmer Carry",
@@ -2567,9 +2567,17 @@ const testMovements = [
             "Walking farmer carry",
             "Farmer carry intervals"
         ],
-        "isLoaded": false,
-        "description": "",
-        "cues": []
+        "isLoaded": true,
+        "description": "Bilateral grip carry.",
+        "cues": [
+            "Shoulders back",
+            "Eyes forward"
+        ],
+        "defaultLoadKg": {
+            "beginner": 12,
+            "scaled": 20,
+            "rx": 24
+        }
     },
     {
         "name": "Sled Push",
@@ -2602,9 +2610,9 @@ const testMovements = [
             "Sprint sled push",
             "Sled push with turns"
         ],
-        "isLoaded": false,
-        "description": "",
-        "cues": []
+        "isLoaded": true,
+        "description": "Lower-body drive against a loaded sled.",
+        "cues": ["Drive through the floor"]
     },
     {
         "name": "Sled Pull",
@@ -2637,9 +2645,9 @@ const testMovements = [
             "Heavy sled pull",
             "Sled pull intervals"
         ],
-        "isLoaded": false,
-        "description": "",
-        "cues": []
+        "isLoaded": true,
+        "description": "Rope or strap drag against sled resistance.",
+        "cues": ["Step and pull"]
     },
     {
         "name": "Yoke Carry",
@@ -2672,9 +2680,9 @@ const testMovements = [
             "Yoke shuttle",
             "Yoke carry intervals"
         ],
-        "isLoaded": false,
-        "description": "",
-        "cues": []
+        "isLoaded": true,
+        "description": "Axially loaded carry for total-body stability.",
+        "cues": ["Brace hard", "Quick steps"]
     },
     {
         "name": "Tire Flip",

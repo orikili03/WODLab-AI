@@ -17,7 +17,7 @@ const quantitySchema = new Schema(
 const performedVolumeSchema = new Schema(
     {
         repsPerRound: [{ type: Number }],           // array — one entry per completed round
-        totalReps:    { type: Number },              // sum(repsPerRound) — computed on save
+        totalReps: { type: Number },              // sum(repsPerRound) — computed on save
     },
     { _id: false }
 );
@@ -26,7 +26,7 @@ const performedVolumeSchema = new Schema(
 const performedSchema = new Schema(
     {
         volume: { type: performedVolumeSchema },
-        load:   { type: Number },                   // kg — actual weight used
+        load: { type: Number },                   // kg — actual weight used
     },
     { _id: false }
 );
@@ -35,12 +35,12 @@ const performedSchema = new Schema(
 const movementItemSchema = new Schema(
     {
         movementId: { type: Schema.Types.ObjectId, ref: "Movement" }, // link to library
-        family:     { type: String },               // e.g. "squat", "hinge", "pull"
-        name:       { type: String, required: true }, // display name: "Thruster"
-        quantity:   { type: quantitySchema, required: true },
-        load:       { type: Number },               // kg — prescribed load (bodyweight = absent)
-        isMaxReps:  { type: Boolean, default: false },
-        performed:  { type: performedSchema },      // optional — filled post-workout
+        family: { type: String },               // e.g. "squat", "hinge", "pull"
+        name: { type: String, required: true }, // display name: "Thruster"
+        quantity: { type: quantitySchema, required: true },
+        load: { type: Number },               // kg — prescribed load (bodyweight = absent)
+        isMaxReps: { type: Boolean, default: false },
+        performed: { type: performedSchema },      // optional — filled post-workout
     },
     { _id: false }
 );
@@ -48,12 +48,14 @@ const movementItemSchema = new Schema(
 // ─── WOD Spec (the core workout structure) ────────────────────────────────
 const wodSpecSchema = new Schema(
     {
-        type:          { type: String, required: true }, // "AMRAP", "EMOM", "FOR_TIME", etc.
-        duration:      { type: Number },                 // minutes (protocol time cap / length)
-        rounds:        { type: Number },                 // for RFT / EMOM (null for AMRAPs)
+        type: { type: String, required: true }, // "AMRAP", "EMOM", "FOR_TIME", etc.
+        duration: { type: Number },                 // minutes (protocol time cap / length)
+        rounds: { type: Number },                 // for RFT / EMOM (null for AMRAPs)
         movementItems: [movementItemSchema],             // structured movement data
-        ladderType:    { type: String },                 // "ascending" | "descending" | "pyramid"
-        scoringType:   { type: String },                 // "AMRAP" | "FOR_TIME"
+        ladderType: { type: String },                 // "ascending" | "descending" | "pyramid"
+        scoringType: { type: String },                 // "AMRAP" | "FOR_TIME"
+        intervalWorkSec: { type: Number },
+        intervalRestSec: { type: Number },
     },
     { _id: false }
 );
@@ -66,8 +68,8 @@ const wodSpecSchema = new Schema(
 const sessionSchema = new Schema(
     {
         totalSeconds: { type: Number },
-        rx:           { type: Boolean, required: true },
-        notes:        { type: String },
+        rx: { type: Boolean, required: true },
+        notes: { type: String },
     },
     { _id: false }
 );
@@ -115,6 +117,8 @@ export interface IWorkout extends Document {
         }>;
         ladderType?: string;
         scoringType?: string;
+        intervalWorkSec?: number;
+        intervalRestSec?: number;
     };
 
     // --- Performance Tracking ---
@@ -162,8 +166,8 @@ const workoutSchema = new Schema<IWorkout>(
 
         // --- Performance Tracking ---
         completedAt: { type: Date },
-        session:     { type: sessionSchema },
-        rpe:         { type: Number, min: 1, max: 5 },
+        session: { type: sessionSchema },
+        rpe: { type: Number, min: 1, max: 5 },
     },
     { timestamps: true }
 );

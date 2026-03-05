@@ -12,13 +12,13 @@ import type { WorkoutResponse } from "../domains/workouts/api";
 function deriveScoreDisplay(workout: WorkoutResponse): string | undefined {
     if (!workout.completedAt) return undefined;
 
-    const type  = workout.wod.type;
-    const s     = workout.session;
+    const type = workout.wod.type;
+    const s = workout.session;
     const first = workout.wod.movementItems[0]?.performed;
 
     if (["FOR_TIME", "21_15_9", "CHIPPER", "INTERVAL"].includes(type)) {
         if (s?.totalSeconds != null) {
-            const m   = Math.floor(s.totalSeconds / 60);
+            const m = Math.floor(s.totalSeconds / 60);
             const sec = s.totalSeconds % 60;
             return `${m}:${String(sec).padStart(2, "0")}`;
         }
@@ -508,6 +508,8 @@ export function HistoryPage() {
                                     durationMinutes={viewWorkout.wod.duration ?? viewWorkout.durationMinutes ?? 0}
                                     rounds={viewWorkout.wod.rounds}
                                     movementItems={viewWorkout.wod.movementItems}
+                                    intervalWorkSec={viewWorkout.wod.intervalWorkSec}
+                                    intervalRestSec={viewWorkout.wod.intervalRestSec}
                                 />
                             </div>
 

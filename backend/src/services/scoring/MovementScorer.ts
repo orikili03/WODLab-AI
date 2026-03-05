@@ -11,17 +11,14 @@ export interface ScoredMovement {
 
 // ─── Scoring Constants ────────────────────────────────────────────────────
 
-const FATIGUE_DECAY_24H   = -10.0;
-const FATIGUE_DECAY_48H   = -2.0;
-const FATIGUE_DECAY_72H   = -1.0;
 const PATTERN_PENALTY_PER = 1.3;
 const PATTERN_PENALTY_CAP = 4.0;
 const METHODIST_OVER_BIAS = -2.0; // over-represented modality (>60% share)
 const METHODIST_UNDER_BIAS = 2.0; // least-represented modality
 const METHODIST_OVER_THRESHOLD = 0.6;
 const GOAL_BONUS_PER_MATCH = 1.0;
-const GOAL_BONUS_MAX       = 3.0;
-const SKILL_BONUS_EXACT    = 1.0;
+const GOAL_BONUS_MAX = 3.0;
+const SKILL_BONUS_EXACT = 1.0;
 const SKILL_BONUS_ADJACENT = 0.5;
 // Top-N pool size for seeded pick
 const PICK_POOL_SIZE = 8;
@@ -29,15 +26,15 @@ const PICK_POOL_SIZE = 8;
 // ─── Goal → StimulusTag affinity table ───────────────────────────────────
 
 const GOAL_TAG_AFFINITY: Record<string, string[]> = {
-    "competition":      ["strength", "power", "speed", "accuracy"],
-    "health":           ["endurance", "balance", "flexibility", "recovery"],
-    "weight loss":      ["engine", "endurance", "stamina"],
-    "general fitness":  ["strength", "endurance", "coordination", "balance"],
-    "strength":         ["strength", "power"],
-    "muscle":           ["strength", "power"],
-    "endurance":        ["endurance", "stamina", "engine"],
-    "flexibility":      ["flexibility", "balance"],
-    "mobility":         ["flexibility", "balance", "recovery"],
+    "competition": ["strength", "power", "speed", "accuracy"],
+    "health": ["endurance", "balance", "flexibility", "recovery"],
+    "weight loss": ["engine", "endurance", "stamina"],
+    "general fitness": ["strength", "endurance", "coordination", "balance"],
+    "strength": ["strength", "power"],
+    "muscle": ["strength", "power"],
+    "endurance": ["endurance", "stamina", "engine"],
+    "flexibility": ["flexibility", "balance"],
+    "mobility": ["flexibility", "balance", "recovery"],
 };
 
 function goalTags(goals: string[]): Set<string> {
@@ -100,41 +97,58 @@ export class MovementScorer {
 
     /**
      * Pick one movement from the ranked pool using a deterministic seeded RNG.
-     *
-     * @param ranked            Output of rankCandidates
-     * @param usedNames         Set of already-selected movement names (mutated on pick)
-     * @param userId            For seed generation
-     * @param salt              Daily salt for seed variety
-     * @param modality          If provided, restrict to this G/W/M modality
-     * @param allowRepeat       If false, skip movements already in usedNames
-     * @param movementComplexity Complexity filter: simple | moderate | advanced
+     * Applies dynamic in-workout collision penalties based on already selected movements.
      */
     pickOne(
         ranked: ScoredMovement[],
         usedNames: Set<string>,
+        selected: FilteredMovement[],
         userId: string,
         salt: string,
         modality?: "G" | "W" | "M",
         allowRepeat: boolean = false,
         movementComplexity: "simple" | "moderate" | "advanced" = "moderate",
     ): FilteredMovement | null {
-        // ── 1. Filter pool ────────────────────────────────────────────────
-        const pool = ranked.filter(({ movement: fm }) => {
-            if (!allowRepeat && usedNames.has(fm.resolvedName)) return false;
-            if (modality) {
-                const mod = (fm.movement as unknown as { modality: string }).modality;
-                if (mod !== modality) return false;
-            }
-            return this.passesComplexityFilter(fm, movementComplexity);
-        });
+        // ── 1. Re-score and Filter pool ──────────────────────────────────
+        // We re-score the pool to apply dynamic in-workout penalties (e.g. Locomotion collision)
+        let pool = ranked
+            .filter(({ movement: fm }) => {
+                if (!allowRepeat && usedNames.has(fm.resolvedName)) return false;
+                if (modality) {
+                    const mod = (fm.movement as unknown as { modality: string }).modality;
+                    if (mod !== modality) return false;
+                }
+                return this.passesComplexityFilter(fm, movementComplexity);
+            })
+            .map(item => {
+                let dynamicScore = item.score;
+                const candidateFamily = (item.movement.movement as any).family;
+
+                // Anti-Pattern: In-workout family collision (e.g. two "carry" or "locomotion" movements)
+                if (candidateFamily) {
+                    const isLocomotion = candidateFamily === "carry" || candidateFamily === "locomotion";
+                    for (const s of selected) {
+                        const sFamily = (s.movement as any).family;
+                        if (sFamily === candidateFamily) {
+                            dynamicScore -= 10.0; // Huge penalty for exact family collision within same workout
+                        } else if (isLocomotion && (sFamily === "carry" || sFamily === "locomotion")) {
+                            dynamicScore -= 10.0; // Huge penalty for multiple traveling movements
+                        }
+                    }
+                }
+
+                return { ...item, dynamicScore };
+            });
 
         if (pool.length === 0) return null;
+
+        // Sort by dynamic score descending
+        pool.sort((a, b) => b.dynamicScore - a.dynamicScore);
 
         // ── 2. Take top-N slice ───────────────────────────────────────────
         const topN = pool.slice(0, Math.min(PICK_POOL_SIZE, pool.length));
 
         // ── 3. Seeded deterministic pick ──────────────────────────────────
-        // Mix usedNames.size into the seed so each slot gets a distinct pick.
         const base = dailySeed(userId, salt);
         const mixedSeed = (base ^ (usedNames.size * 0x9e3779b9)) >>> 0;
         const rng = new SeededRng(mixedSeed);
@@ -162,17 +176,22 @@ export class MovementScorer {
             stimulusTags?: string[];
         };
 
-        // ── 1. Fatigue decay (exponential per 24h window) ─────────────────
+        // ── 1. Fatigue decay (exponential per 24h window + 7D strict cap) ─
+        let last7DaysCount = 0;
         for (const session of context.history) {
-            const h = session.ageHours;
-            const decay =
-                h <= 24 ? FATIGUE_DECAY_24H :
-                h <= 48 ? FATIGUE_DECAY_48H :
-                h <= 72 ? FATIGUE_DECAY_72H : 0;
-            if (decay === 0) continue;
             if (session.movementNames.includes(fm.resolvedName)) {
-                score += decay;
+                const h = session.ageHours;
+                if (h <= 24) score -= 20.0;
+                else if (h <= 48) score -= 5.0;
+                else if (h <= 72) score -= 2.0;
+
+                if (h <= 168) last7DaysCount++; // 168 hours = 7 days
             }
+        }
+
+        // Anti-pattern: Bounding frequent exact repeats over a 7 day window
+        if (last7DaysCount >= 2) {
+            score -= 25.0; // Hard exile if appeared 2+ times recently
         }
 
         // ── 2. Pattern family penalty (capped at -4.0) ────────────────────
@@ -256,9 +275,8 @@ export class MovementScorer {
     /**
      * Returns false if the movement is too complex for the given complexity level.
      *
-     * - simple:   No loaded W movements at advanced/elite difficulty
-     *             (sprint sessions — high reps, no heavy barbell complexity)
-     * - moderate: No elite-difficulty movements
+     * - simple:   Strict block on ANY "advanced" or "elite" movement (Beginner tier safety)
+     * - moderate: Block "elite" movements.
      * - advanced: No restrictions
      */
     private passesComplexityFilter(
@@ -268,18 +286,15 @@ export class MovementScorer {
         if (complexity === "advanced") return true;
 
         const movDoc = fm.movement as unknown as {
-            modality: string;
             difficulty?: string;
-            isLoaded?: boolean;
         };
-        const { modality, difficulty, isLoaded } = movDoc;
+        const { difficulty } = movDoc;
 
         if (complexity === "moderate") {
             return difficulty !== "elite";
         }
 
-        // simple: exclude loaded W movements at advanced/elite difficulty
-        if (modality === "W" && isLoaded) {
+        if (complexity === "simple") {
             return difficulty !== "advanced" && difficulty !== "elite";
         }
 

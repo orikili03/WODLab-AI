@@ -1,6 +1,7 @@
 import type { FilteredMovement } from "./MovementFilterService.js";
 import { movementScorer } from "./scoring/MovementScorer.js";
-import { repTarget } from "./scoring/repTarget.js";
+import { stimulusRepTarget } from "./scoring/repTarget.js";
+import { resolveBlueprint } from "./scoring/ProtocolBlueprintMatrix.js";
 import type { HydratedContext } from "./scoring/WodHydrationService.js";
 import { stimulusIntentService } from "./StimulusIntentService.js";
 import type { ModalityComposition, SlotRequirement } from "./StimulusIntentService.js";
@@ -51,6 +52,8 @@ export interface AssembledWod {
     movementItems: AssembledMovementItem[];
     ladderType?: "ascending" | "descending" | "pyramid";
     scoringType?: "AMRAP" | "FOR_TIME";
+    intervalWorkSec?: number;
+    intervalRestSec?: number;
 }
 
 // ─── Generated Workout (full output from assembly) ────────────────────────
@@ -61,24 +64,8 @@ export interface GeneratedWorkout {
 }
 
 // ─── Template Configuration ───────────────────────────────────────────────
-interface TemplateConfig {
-    movementCount: { min: number; max: number };
-}
-
-const TEMPLATES: Record<WodProtocol, TemplateConfig> = {
-    AMRAP: { movementCount: { min: 3, max: 4 } },
-    EMOM: { movementCount: { min: 2, max: 4 } },
-    FOR_TIME: { movementCount: { min: 2, max: 4 } },
-    TABATA: { movementCount: { min: 2, max: 3 } },
-    DEATH_BY: { movementCount: { min: 1, max: 2 } },
-    "21_15_9": { movementCount: { min: 2, max: 3 } },
-    LADDER: { movementCount: { min: 1, max: 2 } },
-    CHIPPER: { movementCount: { min: 4, max: 6 } },
-    INTERVAL: { movementCount: { min: 2, max: 3 } },
-    STRENGTH_SINGLE: { movementCount: { min: 1, max: 1 } },
-    STRENGTH_SETS: { movementCount: { min: 1, max: 2 } },
-    REST_DAY: { movementCount: { min: 0, max: 0 } },
-};
+// Movement count and duration are now derived from the ProtocolBlueprintMatrix.
+// The TEMPLATES constant has been replaced by resolveBlueprint().
 
 // ─── Stimulus Metadata (static — frontend looks up by protocol type) ──────
 interface StimulusMeta {
@@ -259,31 +246,59 @@ export class WodAssemblyService {
         const ranked = movementScorer.rankCandidates(movements, context, availableEquipment);
         const usedNames = new Set<string>();
 
-        // ── 3. Select protocol + duration (seeded pick from constrained pool) ──
-        const { protocol, duration, ladderType, scoringType } =
-            this.selectProtocolAndDuration(category, userId, salt, intent.allowedProtocols, dateOverride);
+        // ── 3. Select protocol (seeded pick from constrained pool) ────────
+        const { protocol, ladderType, scoringType } =
+            this.selectProtocol(category, userId, salt, intent.allowedProtocols, dateOverride);
 
-        const config = TEMPLATES[protocol];
+        // ── 3b. Protocol-specific composition locks ───────────────────────
+        // If a strength protocol is selected while building a sprint/aerobic day,
+        // it overrides the broad intent with strict strength requirements.
+        if (protocol === "STRENGTH_SINGLE" || protocol === "STRENGTH_SETS") {
+            intent.target = "strength";
+            intent.modalityComposition = { G: "excluded", M: "excluded", W: "required" };
+        }
+
+        // ── 3c. Resolve blueprint (coach playbook for this combination) ───
+        const blueprint = resolveBlueprint(protocol, intent.target, context.fitnessLevel);
+        const rng = new SeededRng(dailySeed(userId, salt + "_dur", dateOverride));
+        const duration = this.pickInRange(blueprint.durationRange, rng);
 
         // ── 4. Composition-directed slot fill ─────────────────────────────
         //  Fill order: required → preferred → optional (excluded never entered)
         const selected: FilteredMovement[] = [];
-        const targetCount = config.movementCount.max;
+        const targetCount = blueprint.movementCount[1];  // max from blueprint
+        const minCount = blueprint.movementCount[0];     // min from blueprint
 
-        const fillOrder = this.buildFillOrder(intent.modalityComposition);
-        for (const { modality, requirement } of fillOrder) {
-            if (requirement === "excluded") continue;
-            if (selected.length >= targetCount) break;
-            const pick = movementScorer.pickOne(
-                ranked, usedNames, userId, salt, modality, false, intent.movementComplexity
+        // For force-monostructural blueprints (classic sprint tabata), lock to M
+        if (blueprint.forceMonostructural) {
+            let pool = ranked;
+            // The user requested to strictly leave TABATA for running sprints
+            if (protocol === "TABATA") {
+                const runOptions = ranked.filter(fm => fm.movement.resolvedName.toLowerCase().includes("run"));
+                if (runOptions.length > 0) {
+                    pool = runOptions;
+                }
+            }
+            const monoPick = movementScorer.pickOne(
+                pool, usedNames, selected, userId, salt, "M", false, intent.movementComplexity
             );
-            if (pick) selected.push(pick);
+            if (monoPick) selected.push(monoPick);
+        } else {
+            const fillOrder = this.buildFillOrder(intent.modalityComposition);
+            for (const { modality, requirement } of fillOrder) {
+                if (requirement === "excluded") continue;
+                if (selected.length >= targetCount) break;
+                const pick = movementScorer.pickOne(
+                    ranked, usedNames, selected, userId, salt, modality, false, intent.movementComplexity
+                );
+                if (pick) selected.push(pick);
+            }
         }
 
         // Fill any remaining slots to hit the min count (best-available, no modality constraint)
-        while (selected.length < config.movementCount.min) {
+        while (selected.length < minCount) {
             const pick = movementScorer.pickOne(
-                ranked, usedNames, userId, salt, undefined, false, intent.movementComplexity
+                ranked, usedNames, selected, userId, salt, undefined, false, intent.movementComplexity
             );
             if (!pick) break;
             selected.push(pick);
@@ -295,31 +310,18 @@ export class WodAssemblyService {
             );
         }
 
-        // ── 4. Build movementItems using modality-aware repTarget ─────────
+        // ── 5. Build movementItems using stimulus-aware prescription ──────
         const movementItems: AssembledMovementItem[] = selected.map((fm) => {
-            const prescription = repTarget(fm.movement, context.fitnessLevel);
-            let reps = prescription.reps;
-
-            // Protocol-specific rep overrides
-            if (protocol === "LADDER") {
-                if (reps > 0) {
-                    if (fm.movement.name.toLowerCase().includes("double under") ||
-                        fm.movement.name.toLowerCase().includes("jump rope")) {
-                        reps = 10;
-                    } else {
-                        reps = 2; // Standard G/W start
-                    }
-                }
-            } else if (protocol === "DEATH_BY") {
-                if (reps > 0) reps = 1;
-            }
+            const prescription = stimulusRepTarget(
+                fm.movement, context.fitnessLevel, blueprint, protocol
+            );
 
             // ── Build structured quantity ──────────────────────────────────
             let quantity: Quantity;
             if (prescription.distance) {
                 quantity = parseDistanceToQuantity(prescription.distance);
             } else {
-                quantity = { value: reps, unit: "reps" };
+                quantity = { value: prescription.reps, unit: "reps" };
             }
 
             // ── Build structured load ─────────────────────────────────────
@@ -343,19 +345,22 @@ export class WodAssemblyService {
                 isMaxReps: false,
             };
         });
-        // ── 5. Assemble WOD object ───────────────────────────────────────
+
+        // ── 6. Assemble WOD object ───────────────────────────────────────
         const wod: AssembledWod = {
             type: protocol,
             protocol,
             category,
             duration,
-            rounds: protocol === "FOR_TIME" ? 1 : undefined,
+            rounds: blueprint.rounds,
             movementItems,
             ladderType,
             scoringType,
+            intervalWorkSec: blueprint.intervalWorkSec,
+            intervalRestSec: blueprint.intervalRestSec,
         };
 
-        // ── 6. Build equipment metadata ───────────────────────────────
+        // ── 7. Build equipment metadata ───────────────────────────────
         const equipmentUsed = Array.from(
             new Set(
                 selected.flatMap(
@@ -371,15 +376,12 @@ export class WodAssemblyService {
         };
     }
 
-    // ─── Protocol Dispatcher (seeded, deterministic) ──────────────────────
-
     /**
-     * Select a protocol + duration from the constrained pool provided by StimulusIntent.
-     * Original weighted options are filtered down to `allowedProtocols` first;
-     * if none survive (shouldn't happen — StimulusIntent always returns a non-empty pool),
-     * falls back to the full original options for that category.
+     * Select a protocol from the constrained pool provided by StimulusIntent.
+     * Duration is now resolved from the ProtocolBlueprintMatrix — this method
+     * only resolves protocol identity + structural metadata.
      */
-    private selectProtocolAndDuration(
+    private selectProtocol(
         category: WodCategory,
         userId: string,
         salt: string = "",
@@ -387,7 +389,6 @@ export class WodAssemblyService {
         dateOverride?: Date,
     ): {
         protocol: WodProtocol;
-        duration: number;
         ladderType?: "ascending" | "descending" | "pyramid";
         scoringType?: "AMRAP" | "FOR_TIME";
     } {
@@ -410,7 +411,6 @@ export class WodAssemblyService {
             const p = this.weightedPick(constrain(all), rng);
             return {
                 protocol: p,
-                duration: p === "TABATA" ? 4 : 7,
                 ladderType: p === "LADDER" ? "ascending" : undefined,
                 scoringType: p === "LADDER" ? "AMRAP" : "FOR_TIME",
             };
@@ -425,12 +425,8 @@ export class WodAssemblyService {
                 { p: "LADDER", w: 10 },
             ];
             const p = this.weightedPick(constrain(all), rng);
-
-            const durations = [8, 10, 12, 15, 18, 20];
-            const duration = durations[Math.floor(rng.next() * durations.length)];
             return {
                 protocol: p,
-                duration,
                 ladderType: p === "LADDER" ? "ascending" : undefined,
                 scoringType: p === "LADDER" ? "AMRAP" : p === "FOR_TIME" ? "FOR_TIME" : "AMRAP",
             };
@@ -445,15 +441,12 @@ export class WodAssemblyService {
             { p: "LADDER", w: 15 },
         ];
         const p = this.weightedPick(constrain(all), rng);
-        const durations = [25, 30, 40];
-        const duration = durations[Math.floor(rng.next() * durations.length)];
         const ladderVariants: Array<"ascending" | "descending" | "pyramid"> = [
             "pyramid",
             "descending",
         ];
         return {
             protocol: p,
-            duration,
             ladderType:
                 p === "LADDER"
                     ? ladderVariants[Math.floor(rng.next() * ladderVariants.length)]
@@ -502,6 +495,13 @@ export class WodAssemblyService {
             r -= o.w;
         }
         return shuffled[0].p;
+    }
+
+    /** Seeded integer pick within an inclusive range [min, max]. */
+    private pickInRange(range: [number, number], rng: SeededRng): number {
+        const [min, max] = range;
+        if (min === max) return min;
+        return min + Math.floor(rng.next() * (max - min + 1));
     }
 }
 

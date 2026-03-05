@@ -9,10 +9,30 @@ const TIME_CAPPED_PROTOCOLS = ["AMRAP", "EMOM", "TABATA", "DEATH BY"];
 function getProtocolHeading(
     type: string,
     durationMinutes: number,
-    rounds?: number
+    rounds?: number,
+    intervalWorkSec?: number,
+    intervalRestSec?: number
 ): string {
     const formatted = formatProtocol(type);
+
+    if (type.toUpperCase() === "INTERVAL" && intervalWorkSec && intervalRestSec) {
+        const formatSecs = (sec: number) => {
+            if (sec >= 60) {
+                const m = Math.floor(sec / 60);
+                const s = sec % 60;
+                return s === 0 ? `${m} min` : `${m} min ${s} sec`;
+            }
+            return `${sec} sec`;
+        };
+        const workStr = formatSecs(intervalWorkSec);
+        const restStr = formatSecs(intervalRestSec);
+        return `${formatted}: ${workStr} ON / ${restStr} OFF x ${durationMinutes} min`;
+    }
+
     if (rounds != null && rounds > 0) {
+        if (rounds === 1) {
+            return "For time";
+        }
         return `${rounds} Rounds for time`;
     }
     const showDuration = TIME_CAPPED_PROTOCOLS.some((p) =>
@@ -54,6 +74,8 @@ export interface WodBlockProps {
     rounds?: number;
     /** Structured movement data. */
     movementItems: MovementItemSpec[];
+    intervalWorkSec?: number;
+    intervalRestSec?: number;
     className?: string;
 }
 
@@ -62,9 +84,11 @@ export function WodBlock({
     durationMinutes,
     rounds,
     movementItems,
+    intervalWorkSec,
+    intervalRestSec,
     className = "",
 }: WodBlockProps) {
-    const heading = getProtocolHeading(type, durationMinutes, rounds);
+    const heading = getProtocolHeading(type, durationMinutes, rounds, intervalWorkSec, intervalRestSec);
 
     return (
         <div className={className}>

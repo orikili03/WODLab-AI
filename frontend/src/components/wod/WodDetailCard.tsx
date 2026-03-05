@@ -35,6 +35,8 @@ export function WodDetailCard({
                     durationMinutes={wod.duration ?? 0}
                     rounds={wod.rounds}
                     movementItems={wod.movementItems}
+                    intervalWorkSec={wod.intervalWorkSec}
+                    intervalRestSec={wod.intervalRestSec}
                 />
                 {(equipmentPresetName || equipmentRequired.length > 0) && (
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
